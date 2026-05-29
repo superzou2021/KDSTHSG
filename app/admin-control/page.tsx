@@ -1,0 +1,92 @@
+"use client";
+
+import { useMemo, useState } from "react";
+import Layout from "@/components/Layout";
+import { GAME_ORDER } from "@/lib/constants";
+import { loadState, resetDemoData } from "@/lib/storage";
+import { useAdminActions, useAppState } from "@/hooks/use-game-data";
+import type { GameKey } from "@/types";
+
+export default function AdminControlPage() {
+  const { state, refresh } = useAppState();
+  const { toggleGameOpen } = useAdminActions();
+  const [exportText, setExportText] = useState("");
+
+  const completion = useMemo(() => {
+    return GAME_ORDER.map((key) => ({
+      key,
+      count: state.gameResults.filter((result) => result.gameKey === key).length
+    }));
+  }, [state.gameResults]);
+
+  function handleToggle(key: GameKey) {
+    const nextState = toggleGameOpen(key);
+    refresh();
+    const game = nextState.games.find((item) => item.key === key);
+    setExportText(`${game?.name || key} 已${game?.isOpen ? "开启" : "关闭"}`);
+  }
+
+  function handleExport() {
+    setExportText(JSON.stringify(loadState(), null, 2));
+  }
+
+  function handleReset() {
+    resetDemoData();
+    refresh();
+    setExportText("");
+  }
+
+  return (
+    <Layout title="现场控制台" eyebrow="ADMIN CONTROL">
+      <section className="scoreGrid">
+        <div>
+          <span>参与人数</span>
+          <b>{state.players.length}</b>
+        </div>
+        <div>
+          <span>结果记录</span>
+          <b>{state.gameResults.length}</b>
+        </div>
+        <div>
+          <span>已完赛</span>
+          <b>{state.players.filter((player) => player.finalSubmitted).length}</b>
+        </div>
+      </section>
+      <section className="sectionBlock">
+        <h2>游戏开关</h2>
+        <div className="adminList">
+          {[...state.games].sort((a, b) => a.order - b.order).map((game) => (
+            <div className="adminRow" key={game.key}>
+              <div>
+                <b>{game.name}</b>
+                <span>
+                  当前状态：{game.isOpen ? "开放中" : "已关闭"} / 完成人数{" "}
+                  {completion.find((item) => item.key === game.key)?.count || 0}
+                </span>
+              </div>
+              <button
+                className={game.isOpen ? "primaryButton smallButton" : "secondaryButton smallButton"}
+                type="button"
+                onClick={() => handleToggle(game.key)}
+              >
+                {game.isOpen ? "点击关闭" : "点击开启"}
+              </button>
+            </div>
+          ))}
+        </div>
+      </section>
+      <section className="sectionBlock">
+        <h2>数据导出</h2>
+        <div className="pageActions">
+          <button className="primaryButton" type="button" onClick={handleExport}>
+            生成 JSON
+          </button>
+          <button className="secondaryButton" type="button" onClick={handleReset}>
+            重置 DEMO 数据
+          </button>
+        </div>
+        {exportText && <textarea className="exportBox" value={exportText} readOnly />}
+      </section>
+    </Layout>
+  );
+}
