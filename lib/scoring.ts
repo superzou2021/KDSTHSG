@@ -1,9 +1,9 @@
 export function calculateBingoScore(correctCount: number): number {
-  return Math.min(correctCount * 10, 100);
+  return Math.max(0, Math.min(correctCount * 10, 100));
 }
 
 export function calculateQuizScore(correctCount: number): number {
-  return Math.min(correctCount * 10, 100);
+  return Math.max(0, Math.min(correctCount * 10, 100));
 }
 
 export function calculateStoryScore(results: boolean[]): number {
@@ -14,9 +14,9 @@ export function calculateStoryScore(results: boolean[]): number {
   if (results.length === 3 && results.every(Boolean)) {
     score += 10;
   }
-  return Math.min(score, 100);
+  return Math.max(0, Math.min(score, 100));
 }
 
 export function calculateEliminationScore(correctCount: number): number {
-  return Math.min(correctCount * 20, 100);
+  return Math.max(0, Math.min(correctCount * 20, 100));
 }

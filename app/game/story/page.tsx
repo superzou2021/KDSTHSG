@@ -99,7 +99,7 @@ export default function StoryPage() {
         </section>
       )}
       <section className="statusPanel">
-        <b>当前 {score} 分，三题全对额外 +10</b>
+        <b>已完成 {Object.keys(answers).length}/3</b>
         <span>{message || "每次只生成一道故事题，手动进入下一题。"}</span>
       </section>
       {isLastQuestion ? (

@@ -24,6 +24,13 @@ export default function QuizPage() {
   const [modal, setModal] = useState({ open: false, score: 0, total: 0, rank: 0 });
   const [message, setMessage] = useState("");
 
+  // 先定义所有计算变量
+  const currentQuestion = questions[currentIndex];
+  const selectedAnswer = currentQuestion ? answers[currentQuestion.id] : "";
+  const isLastQuestion = currentIndex === questions.length - 1;
+  const correctCount = useMemo(() => questions.filter((question) => answers[question.id] === question.correctAnswer).length, [answers, questions]);
+  const score = calculateQuizScore(correctCount);
+
   useEffect(() => {
     if (playerId === null) router.push("/register");
   }, [playerId, router]);
@@ -38,11 +45,48 @@ export default function QuizPage() {
     return () => window.clearInterval(timer);
   }, [modal.open, existing, isOpen]);
 
-  const currentQuestion = questions[currentIndex];
-  const selectedAnswer = currentQuestion ? answers[currentQuestion.id] : "";
-  const isLastQuestion = currentIndex === questions.length - 1;
-  const correctCount = useMemo(() => questions.filter((question) => answers[question.id] === question.correctAnswer).length, [answers, questions]);
-  const score = calculateQuizScore(correctCount);
+  // 倒计时结束时自动跳转下一组题目
+  useEffect(() => {
+    if (seconds > 0 || modal.open || existing || isOpen !== true) return;
+    
+    const lastQuestion = currentIndex === questions.length - 1;
+    if (lastQuestion) {
+      // 如果是最后一题，直接提交
+      if (playerId) {
+        try {
+          const outcome = submitGameResult({ playerId, gameKey: "quiz", answers, score });
+          refresh();
+          setExisting(outcome.result);
+          setModal({ open: true, score: outcome.result.score, total: outcome.player.totalScore, rank: outcome.rank });
+        } catch {
+          // 提交失败也不处理
+        }
+      }
+    } else {
+      // 计算下一组题目的开始位置
+      const currentGroupStart = Math.floor(currentIndex / 2) * 2;
+      const nextGroupStart = currentGroupStart + 2;
+      
+      if (nextGroupStart < questions.length) {
+        // 跳转到下一组
+        setCurrentIndex(nextGroupStart);
+        setSeconds(QUIZ_SECONDS);
+        setMessage("时间到，已自动跳转下一组题目");
+      } else {
+        // 没有下一组，直接提交
+        if (playerId) {
+          try {
+            const outcome = submitGameResult({ playerId, gameKey: "quiz", answers, score });
+            refresh();
+            setExisting(outcome.result);
+            setModal({ open: true, score: outcome.result.score, total: outcome.player.totalScore, rank: outcome.rank });
+          } catch {
+            // 提交失败也不处理
+          }
+        }
+      }
+    }
+  }, [seconds]); // 简化依赖数组，只监听 seconds
 
   if (isOpen === false) {
     return (
@@ -56,7 +100,7 @@ export default function QuizPage() {
   }
 
   function chooseAnswer(option: string) {
-    if (!currentQuestion || isOpen !== true || existing) return;
+    if (!currentQuestion || isOpen !== true || existing || seconds === 0) return;
     setAnswers((current) => ({ ...current, [currentQuestion.id]: option }));
     setMessage("");
   }
@@ -65,6 +109,10 @@ export default function QuizPage() {
     if (!selectedAnswer) {
       setMessage("请先选择本题答案");
       return;
+    }
+    // 每两题重置计时器
+    if ((currentIndex + 1) % 2 === 0) {
+      setSeconds(QUIZ_SECONDS);
     }
     setCurrentIndex((index) => Math.min(index + 1, questions.length - 1));
     setMessage("");
@@ -76,7 +124,7 @@ export default function QuizPage() {
       setMessage("该游戏暂未开放");
       return;
     }
-    if (!selectedAnswer || Object.keys(answers).length < questions.length) {
+    if (!selectedAnswer) {
       setMessage("请完成当前题目后再提交");
       return;
     }
@@ -101,7 +149,7 @@ export default function QuizPage() {
             <h3>{currentQuestion.title}</h3>
             <div className="optionGrid">
               {currentQuestion.options?.map((option) => (
-                <button className={selectedAnswer === option ? "selected" : ""} disabled={Boolean(existing) || isOpen !== true} key={option} type="button" onClick={() => chooseAnswer(option)}>
+                <button className={selectedAnswer === option ? "selected" : ""} disabled={Boolean(existing) || isOpen !== true || seconds === 0} key={option} type="button" onClick={() => chooseAnswer(option)}>
                   {option}
                 </button>
               ))}
@@ -110,15 +158,15 @@ export default function QuizPage() {
         </section>
       )}
       <section className="statusPanel">
-        <b>已完成 {Object.keys(answers).length}/10，当前 {score} 分</b>
-        <span>{message || "每次只生成一道题，选择答案后手动进入下一题。"}</span>
+        <b>已完成 {Object.keys(answers).length}/10</b>
+        <span>{message || "每两题需要在一分钟之内完成，选择答案后手动进入下一题，时间到自动跳转。"}</span>
       </section>
       {isLastQuestion ? (
-        <button className="primaryButton" disabled={Boolean(existing) || isOpen !== true || !selectedAnswer} type="button" onClick={submit}>
+        <button className="primaryButton" disabled={Boolean(existing) || isOpen !== true || !selectedAnswer || seconds === 0} type="button" onClick={submit}>
           提交 Quick Quiz
         </button>
       ) : (
-        <button className="primaryButton" disabled={Boolean(existing) || isOpen !== true || !selectedAnswer} type="button" onClick={goNext}>
+        <button className="primaryButton" disabled={Boolean(existing) || isOpen !== true || !selectedAnswer || seconds === 0} type="button" onClick={goNext}>
           下一题
         </button>
       )}

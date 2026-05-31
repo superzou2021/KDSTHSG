@@ -65,7 +65,7 @@ export function useQuestions(gameKey: GameKey) {
   return questions;
 }
 
-export function useGameStatus(gameKey: GameKey, autoRefresh = true) {
+export function useGameStatus(gameKey: GameKey) {
   const [open, setOpen] = useState<boolean | null>(null);
   const refresh = useCallback(() => setOpen(isGameOpen(gameKey)), [gameKey]);
 
@@ -73,20 +73,11 @@ export function useGameStatus(gameKey: GameKey, autoRefresh = true) {
     refresh();
     window.addEventListener("annual-game-state-change", refresh);
     window.addEventListener("storage", refresh);
-    
-    let timer: number | undefined;
-    if (autoRefresh) {
-      timer = window.setInterval(refresh, 2000);
-    }
-    
     return () => {
       window.removeEventListener("annual-game-state-change", refresh);
       window.removeEventListener("storage", refresh);
-      if (timer) {
-        window.clearInterval(timer);
-      }
     };
-  }, [refresh, autoRefresh]);
+  }, [refresh]);
 
   return open;
 }
@@ -128,9 +119,18 @@ export function useRanking(playerId?: string | null, intervalMs?: number) {
 
   useEffect(() => {
     refresh();
-    if (!intervalMs) return undefined;
+    window.addEventListener("annual-game-state-change", refresh);
+    window.addEventListener("storage", refresh);
+    if (!intervalMs) return () => {
+      window.removeEventListener("annual-game-state-change", refresh);
+      window.removeEventListener("storage", refresh);
+    };
     const timer = window.setInterval(refresh, intervalMs);
-    return () => window.clearInterval(timer);
+    return () => {
+      window.clearInterval(timer);
+      window.removeEventListener("annual-game-state-change", refresh);
+      window.removeEventListener("storage", refresh);
+    };
   }, [refresh, intervalMs]);
 
   return { ranking, refresh };

@@ -35,14 +35,10 @@ export function loadState(): AppState {
   }
   try {
     const parsed = JSON.parse(raw) as AppState;
-    const games = GAMES.map((defaultGame) => {
-      const savedGame = parsed.games?.find((g) => g.key === defaultGame.key);
-      return { ...defaultGame, ...savedGame };
-    });
     return {
       ...getInitialState(),
       ...parsed,
-      games,
+      games: parsed.games?.length ? parsed.games : GAMES,
       questions: parsed.questions?.length ? parsed.questions : QUESTIONS
     };
   } catch {
@@ -70,7 +66,15 @@ export function getCurrentPlayer(): Player | null {
 }
 
 export function validatePhone(phone: string): boolean {
-  return /^1[3-9]\d{9}$/.test(phone);
+  if (!phone || phone.length !== 11) return false;
+  if (phone[0] !== '1') return false;
+  const secondChar = parseInt(phone[1], 10);
+  if (isNaN(secondChar) || secondChar < 3 || secondChar > 9) return false;
+  for (let i = 2; i < 11; i++) {
+    const char = phone[i];
+    if (char < '0' || char > '9') return false;
+  }
+  return true;
 }
 
 export function registerPlayer(input: { name: string; phone: string; office: string; team: string }): { player: Player; reused: boolean } {

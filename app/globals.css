@@ -343,12 +343,6 @@ button:disabled {
   background: rgba(0, 203, 130, 0.08);
 }
 
-.disabled {
-  opacity: 0.46;
-  cursor: not-allowed;
-  pointer-events: none;
-}
-
 .marketCard {
   padding: 16px;
   background:

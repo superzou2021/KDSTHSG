@@ -104,8 +104,8 @@ export default function BingoPage() {
         ))}
       </section>
       <section className="statusPanel">
-        <b>已选 {selectedWords.length}/9，预估 {previewScore} 分</b>
-        <span>{message || "现场演示可直接选择目标词，也可以故意选错展示自动判分。"}</span>
+        <b>已选 {selectedWords.length}/9</b>
+        <span>{message || "请从词库中选择 9 个词组成 Bingo 宫格。"}</span>
       </section>
       <button className="primaryButton" type="button" disabled={Boolean(existing) || isOpen !== true || selectedWords.length !== 9} onClick={handleSubmit}>
         提交 Bingo

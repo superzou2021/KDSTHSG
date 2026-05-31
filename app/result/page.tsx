@@ -9,12 +9,13 @@ import OfficeTop3Panel from "@/components/OfficeTop3Panel";
 import RankingTable from "@/components/RankingTable";
 import ScorePanel from "@/components/ScorePanel";
 import { GAME_ORDER } from "@/lib/constants";
-import { useCurrentPlayer, useRanking } from "@/hooks/use-game-data";
+import { useCurrentPlayer, useLobbySnapshot, useRanking } from "@/hooks/use-game-data";
 
 export default function ResultPage() {
   const router = useRouter();
   const { player, playerId } = useCurrentPlayer();
   const { ranking } = useRanking(playerId);
+  const { snapshot } = useLobbySnapshot(playerId);
 
   useEffect(() => {
     if (playerId === null) router.push("/register");
@@ -24,6 +25,12 @@ export default function ResultPage() {
 
   const context = ranking.context;
   const missingGames = GAME_ORDER.filter((key) => !player.completedGames.includes(key));
+  
+  // 获取最后完成的游戏的分数
+  const lastResult = snapshot?.results
+    .slice()
+    .sort((a, b) => new Date(b.completedAt).getTime() - new Date(a.completedAt).getTime())[0];
+  const roundScore = lastResult?.score || 0;
 
   return (
     <Layout title="最终成绩" eyebrow="RESULT" rightSlot={<Link href="/ranking">排行</Link>}>
@@ -35,7 +42,7 @@ export default function ResultPage() {
         </div>
         <strong>#{context?.rank || "-"}</strong>
       </section>
-      <ScorePanel roundScore={0} totalScore={player.totalScore} rank={context?.rank || 0} />
+      <ScorePanel roundScore={roundScore} totalScore={player.totalScore} rank={context?.rank || 0} />
       {missingGames.length > 0 && (
         <section className="statusBanner">
           还有 {missingGames.length} 个游戏未完成，建议回大厅继续完成后再展示最终成绩。
@@ -61,7 +68,6 @@ export default function ResultPage() {
       </section>
       <div className="pageActions">
         <Link className="primaryButton" href="/lobby">返回大厅</Link>
-        <Link className="secondaryButton" href="/screen">打开大屏</Link>
       </div>
     </Layout>
   );

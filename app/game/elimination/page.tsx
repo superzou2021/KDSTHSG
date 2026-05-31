@@ -99,7 +99,7 @@ export default function EliminationPage() {
         </section>
       )}
       <section className="statusPanel">
-        <b>答对 {correctCount}/5，当前 {score} 分</b>
+        <b>已完成 {Object.keys(answers).length}/5</b>
         <span>{message || "每次只生成一道淘汰题，手动进入下一题。"}</span>
       </section>
       {isLastQuestion ? (
@@ -111,7 +111,7 @@ export default function EliminationPage() {
           下一题
         </button>
       )}
-      <ResultModal open={modal.open} gameName="站立淘汰" roundScore={modal.score} totalScore={modal.total} rank={modal.rank} onBackLobby={() => router.push("/lobby")} />
+      <ResultModal open={modal.open} gameName="站立淘汰" roundScore={modal.score} totalScore={modal.total} rank={modal.rank} onBackLobby={() => router.push("/result")} buttonText="查看最终成绩" />
     </Layout>
   );
 }
