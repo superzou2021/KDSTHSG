@@ -3,14 +3,14 @@
 }
 
 :root {
-  --green: #00cb82;
-  --green-bright: #00ff9f;
+  --green: #00b86a;
+  --green-bright: #40d88a;
   --gold: #ffd060;
-  --ink: #edf2ee;
-  --muted: #6a7a6e;
-  --panel: rgba(6, 12, 8, 0.9);
-  --panel-soft: rgba(0, 203, 130, 0.06);
-  --border: rgba(0, 203, 130, 0.18);
+  --ink: #ffffff;
+  --muted: #a0b5a8;
+  --panel: rgba(12, 45, 34, 0.9);
+  --panel-soft: rgba(0, 184, 106, 0.12);
+  --border: rgba(64, 216, 138, 0.35);
   --danger: #ff5a5f;
   --mono: "SF Mono", "Cascadia Code", "Fira Code", "Courier New", monospace;
   --sans: "PingFang SC", "Microsoft YaHei UI", "Segoe UI", sans-serif;
@@ -25,9 +25,8 @@ body {
 body {
   color: var(--ink);
   background:
-    radial-gradient(ellipse at 50% 20%, rgba(0, 203, 130, 0.14), transparent 44%),
-    radial-gradient(ellipse at 50% 80%, rgba(255, 208, 96, 0.08), transparent 35%),
-    #010203;
+    radial-gradient(ellipse at 50% 25%, rgba(64, 216, 138, 0.2), transparent 55%),
+    #063125;
   font-family: var(--sans);
   user-select: none;
 }
@@ -58,13 +57,13 @@ button:disabled {
   min-height: 660px;
   position: relative;
   overflow: hidden;
-  border: 1px solid rgba(0, 203, 130, 0.28);
+  border: 1px solid rgba(64, 216, 138, 0.35);
   border-radius: 38px;
-  background: #050906;
+  background: #063125;
   box-shadow:
-    0 0 0 1px rgba(0, 0, 0, 0.8),
-    0 28px 90px rgba(0, 0, 0, 0.72),
-    inset 0 1px 0 rgba(255, 255, 255, 0.05);
+    0 0 0 1px rgba(0, 0, 0, 0.3),
+    0 28px 90px rgba(0, 0, 0, 0.5),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
 }
 
 .phoneFrame::after {
@@ -96,8 +95,8 @@ button:disabled {
   z-index: 5;
   transform: translateX(-50%);
   border-radius: 0 0 15px 15px;
-  background: #050906;
-  border: 1px solid rgba(0, 203, 130, 0.1);
+  background: #063125;
+  border: 1px solid rgba(64, 216, 138, 0.2);
   border-top: 0;
 }
 
@@ -143,17 +142,17 @@ button:disabled {
 }
 
 .heroMark {
-  width: 82px;
-  height: 82px;
+  width: 88px;
+  height: 88px;
   display: grid;
   place-items: center;
-  margin-bottom: 18px;
-  border: 1px solid rgba(0, 203, 130, 0.32);
-  border-radius: 18px;
-  color: var(--green);
-  background: rgba(0, 203, 130, 0.08);
-  box-shadow: 0 0 34px rgba(0, 203, 130, 0.16);
-  font: 900 28px/1 var(--mono);
+  margin-bottom: 20px;
+  border: 2px solid rgba(0, 184, 106, 0.4);
+  border-radius: 22px;
+  color: var(--green-bright);
+  background: rgba(0, 184, 106, 0.12);
+  box-shadow: 0 0 40px rgba(0, 184, 106, 0.25);
+  font: 900 30px/1 var(--mono);
 }
 
 .eyebrow,
@@ -233,9 +232,9 @@ button:disabled {
 .questionPanel,
 .statusPanel {
   border: 1px solid var(--border);
-  border-radius: 10px;
-  background: var(--panel);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.035);
+  border-radius: 16px;
+  background: rgba(16, 58, 44, 0.95);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
 }
 
 .panel {
@@ -283,9 +282,9 @@ button:disabled {
 .rankRow,
 .matchGrid button,
 .optionsList button {
-  border: 1px solid rgba(106, 122, 110, 0.24);
-  border-radius: 8px;
-  background: rgba(106, 122, 110, 0.06);
+  border: 1px solid rgba(160, 181, 168, 0.3);
+  border-radius: 10px;
+  background: rgba(160, 181, 168, 0.12);
   color: var(--ink);
 }
 
@@ -313,9 +312,9 @@ button:disabled {
 }
 
 .fundButton.selected {
-  color: var(--green);
-  border-color: rgba(0, 203, 130, 0.65);
-  background: rgba(0, 203, 130, 0.12);
+  color: var(--ink);
+  border-color: rgba(0, 184, 106, 0.8);
+  background: linear-gradient(135deg, #00b86a, #40d88a);
 }
 
 .primaryButton,
@@ -436,35 +435,61 @@ button:disabled {
 .bingoBoard {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 7px;
+  gap: 12px;
+  padding: 16px;
+  background: rgba(16, 58, 44, 0.5);
+  border-radius: 20px;
+  border: 2px solid rgba(64, 216, 138, 0.2);
 }
 
 .bingoBoard button {
   aspect-ratio: 1;
   min-width: 0;
-  padding: 5px;
+  padding: 8px;
   color: var(--muted);
-  border: 1px solid rgba(0, 203, 130, 0.16);
-  border-radius: 9px;
-  background: rgba(6, 11, 8, 0.92);
-  font: 900 13px/1.2 var(--mono);
+  border: 2px solid rgba(160, 181, 168, 0.25);
+  border-radius: 16px;
+  background: rgba(6, 31, 22, 0.8);
+  font: 800 12px/1.3 var(--sans);
   transition:
-    transform 160ms ease,
-    border-color 160ms ease,
-    background 160ms ease;
+    transform 200ms ease,
+    border-color 200ms ease,
+    background 200ms ease,
+    box-shadow 200ms ease;
+  box-shadow:
+    0 2px 8px rgba(0, 0, 0, 0.2),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  word-break: break-word;
+}
+
+.bingoBoard button:hover:not(:disabled) {
+  transform: translateY(-2px);
+  border-color: rgba(64, 216, 138, 0.4);
+  box-shadow:
+    0 4px 12px rgba(0, 184, 106, 0.15),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
 }
 
 .bingoBoard button.lit {
-  color: var(--green);
-  border-color: rgba(0, 203, 130, 0.62);
-  background: rgba(0, 203, 130, 0.12);
+  color: var(--ink);
+  border-color: rgba(0, 184, 106, 0.8);
+  background: linear-gradient(135deg, #00b86a, #40d88a);
+  box-shadow:
+    0 0 20px rgba(0, 184, 106, 0.3),
+    inset 0 1px 0 rgba(255, 255, 255, 0.2);
 }
 
 .bingoBoard button.bingo {
-  color: var(--gold);
-  border-color: rgba(255, 208, 96, 0.72);
-  background: rgba(255, 208, 96, 0.12);
-  box-shadow: 0 0 18px rgba(255, 208, 96, 0.16);
+  color: var(--ink);
+  border-color: rgba(255, 208, 96, 0.9);
+  background: linear-gradient(135deg, #ffd060, #ffe69c);
+  box-shadow:
+    0 0 25px rgba(255, 208, 96, 0.4),
+    inset 0 1px 0 rgba(255, 255, 255, 0.3);
 }
 
 .statusPanel {
@@ -499,17 +524,17 @@ button:disabled {
 }
 
 .timerTrack {
-  height: 5px;
+  height: 8px;
   overflow: hidden;
-  border-radius: 5px;
-  background: rgba(0, 203, 130, 0.1);
+  border-radius: 8px;
+  background: rgba(160, 181, 168, 0.25);
 }
 
 .timerTrack span {
   display: block;
   height: 100%;
   border-radius: inherit;
-  background: linear-gradient(90deg, var(--danger), var(--gold), var(--green));
+  background: linear-gradient(90deg, var(--green-bright), var(--green));
   transition: width 280ms linear;
 }
 
@@ -546,9 +571,9 @@ button:disabled {
 }
 
 .optionsList button.correct {
-  color: var(--green);
-  border-color: rgba(0, 203, 130, 0.72);
-  background: rgba(0, 203, 130, 0.13);
+  color: var(--ink);
+  border-color: rgba(0, 184, 106, 0.9);
+  background: linear-gradient(135deg, #00b86a, #40d88a);
 }
 
 .matchGrid {
@@ -663,27 +688,29 @@ button:disabled {
 
 .landingHero {
   width: min(100%, 480px);
-  padding: 26px;
-  border: 1px solid rgba(0, 203, 130, 0.26);
-  border-radius: 18px;
-  background: rgba(5, 9, 6, 0.82);
-  box-shadow: 0 30px 90px rgba(0, 0, 0, 0.56);
+  padding: 28px;
+  border: 2px solid rgba(64, 216, 138, 0.3);
+  border-radius: 24px;
+  background: rgba(16, 58, 44, 0.95);
+  box-shadow: 0 30px 90px rgba(0, 0, 0, 0.56), inset 0 1px 0 rgba(255, 255, 255, 0.08);
 }
 
 .landingHero h1 {
-  margin: 14px 0 10px;
-  font: 900 42px/1 var(--mono);
+  margin: 16px 0 12px;
+  color: var(--ink);
+  font: 900 44px/1 var(--mono);
 }
 
 .landingHero h1 span {
   display: block;
-  margin-top: 8px;
+  margin-top: 10px;
   color: var(--green);
-  font: 800 22px/1.2 var(--sans);
+  font: 800 24px/1.2 var(--sans);
+  text-shadow: 0 0 20px rgba(0, 184, 106, 0.4);
 }
 
 .landingHero p {
-  margin: 0 0 18px;
+  margin: 0 0 20px;
   color: var(--muted);
   line-height: 1.65;
 }
@@ -697,8 +724,8 @@ button:disabled {
 .landingLinks {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: 8px;
-  margin-top: 10px;
+  gap: 10px;
+  margin-top: 14px;
 }
 
 .landingLinks a,
@@ -706,6 +733,12 @@ button:disabled {
   color: var(--green);
   text-decoration: none;
   font: 800 12px/1 var(--mono);
+  text-align: center;
+  transition: opacity 200ms ease;
+}
+
+.landingLinks a:hover {
+  opacity: 0.8;
 }
 
 .mobilePage {
@@ -731,10 +764,10 @@ button:disabled {
   height: 40px;
   display: grid;
   place-items: center;
-  color: var(--green);
-  border: 1px solid rgba(0, 203, 130, 0.32);
-  border-radius: 10px;
-  background: rgba(0, 203, 130, 0.08);
+  color: var(--ink);
+  border: none;
+  border-radius: 8px;
+  background: transparent;
 }
 
 .topNav h1 {
@@ -755,8 +788,8 @@ button:disabled {
 .sectionBlock,
 .screenPanel {
   border: 1px solid var(--border);
-  border-radius: 10px;
-  background: rgba(6, 12, 8, 0.9);
+  border-radius: 16px;
+  background: rgba(16, 58, 44, 0.95);
 }
 
 .demoForm {
@@ -780,9 +813,9 @@ button:disabled {
 .demoForm select {
   min-height: 44px;
   color: var(--ink);
-  border: 1px solid rgba(0, 203, 130, 0.24);
-  border-radius: 8px;
-  background: rgba(0, 203, 130, 0.06);
+  border: 1px solid rgba(64, 216, 138, 0.4);
+  border-radius: 10px;
+  background: rgba(160, 181, 168, 0.15);
   padding: 0 12px;
   outline: none;
 }
@@ -859,17 +892,17 @@ button:disabled {
 }
 
 .progressLine {
-  height: 5px;
+  height: 8px;
   overflow: hidden;
-  border-radius: 6px;
-  background: rgba(0, 203, 130, 0.12);
+  border-radius: 8px;
+  background: rgba(160, 181, 168, 0.25);
 }
 
 .progressLine span {
   display: block;
   height: 100%;
   border-radius: inherit;
-  background: linear-gradient(90deg, var(--green), var(--gold));
+  background: linear-gradient(90deg, var(--green-bright), var(--green));
 }
 
 .gameEntry {
@@ -924,44 +957,82 @@ button:disabled {
 .wordBank {
   display: flex;
   flex-wrap: wrap;
-  gap: 7px;
+  gap: 8px;
+  padding: 12px;
+  background: rgba(16, 58, 44, 0.3);
+  border-radius: 16px;
+  border: 1px solid rgba(64, 216, 138, 0.15);
 }
 
 .wordBank button,
 .optionGrid button {
   color: var(--ink);
-  border: 1px solid rgba(106, 122, 110, 0.28);
-  border-radius: 8px;
-  background: rgba(106, 122, 110, 0.08);
-  min-height: 38px;
-  padding: 8px 10px;
+  border: 2px solid rgba(160, 181, 168, 0.35);
+  border-radius: 12px;
+  background: rgba(16, 58, 44, 0.6);
+  min-height: 42px;
+  padding: 10px 14px;
+  font: 700 13px/1.3 var(--sans);
+  transition: all 200ms ease;
+  box-shadow:
+    0 2px 6px rgba(0, 0, 0, 0.15),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+
+.wordBank button:hover:not(:disabled),
+.optionGrid button:hover:not(:disabled) {
+  transform: translateY(-1px);
+  border-color: rgba(64, 216, 138, 0.5);
+  background: rgba(16, 58, 44, 0.8);
 }
 
 .wordBank button.selected,
 .optionGrid button.selected {
-  color: var(--green);
-  border-color: rgba(0, 203, 130, 0.68);
-  background: rgba(0, 203, 130, 0.13);
+  color: var(--ink);
+  border-color: rgba(0, 184, 106, 0.9);
+  background: linear-gradient(135deg, #00b86a, #40d88a);
+  box-shadow:
+    0 0 15px rgba(0, 184, 106, 0.25),
+    inset 0 1px 0 rgba(255, 255, 255, 0.2);
+}
+
+.demoBoard {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  padding: 16px;
+  background: rgba(16, 58, 44, 0.5);
+  border-radius: 20px;
+  border: 2px solid rgba(64, 216, 138, 0.2);
 }
 
 .demoBoard div {
   aspect-ratio: 1;
   min-width: 0;
-  display: grid;
-  place-items: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   color: var(--muted);
-  border: 1px solid rgba(0, 203, 130, 0.16);
-  border-radius: 9px;
-  background: rgba(6, 11, 8, 0.92);
-  font: 900 13px/1.2 var(--mono);
+  border: 2px solid rgba(160, 181, 168, 0.25);
+  border-radius: 16px;
+  background: rgba(6, 31, 22, 0.8);
+  font: 800 14px/1.3 var(--sans);
   text-align: center;
-  padding: 5px;
+  padding: 8px;
+  box-shadow:
+    0 2px 8px rgba(0, 0, 0, 0.2),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  transition: all 200ms ease;
+  word-break: break-word;
 }
 
 .demoBoard div.lit {
-  color: var(--green);
-  border-color: rgba(0, 203, 130, 0.62);
-  background: rgba(0, 203, 130, 0.12);
+  color: var(--ink);
+  border-color: rgba(0, 184, 106, 0.8);
+  background: linear-gradient(135deg, #00b86a, #40d88a);
+  box-shadow:
+    0 0 20px rgba(0, 184, 106, 0.3),
+    inset 0 1px 0 rgba(255, 255, 255, 0.2);
 }
 
 .demoCard {
@@ -1007,25 +1078,27 @@ button:disabled {
 }
 
 .countdown {
-  padding: 12px;
-  border: 1px solid rgba(0, 203, 130, 0.2);
-  border-radius: 10px;
-  background: rgba(0, 203, 130, 0.06);
+  padding: 16px 0;
+  border: none;
+  border-radius: 0;
+  background: transparent;
 }
 
 .countdown > div:first-child {
   display: flex;
   justify-content: space-between;
-  margin-bottom: 8px;
+  margin-bottom: 10px;
 }
 
 .countdown span {
-  color: var(--muted);
+  color: var(--ink);
+  font-weight: bold;
 }
 
 .countdown b {
-  color: var(--gold);
+  color: var(--ink);
   font-family: var(--mono);
+  font-weight: bold;
 }
 
 .modalMask {

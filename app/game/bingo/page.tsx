@@ -78,11 +78,16 @@ export default function BingoPage() {
 
   return (
     <Layout title="Bingo 猜词" eyebrow="GAME 01">
-      <section className="demoCard">
-        <h2>从词库选择 9 个词</h2>
-        <p>系统词库共 30 个词，命中活动关键词每个 10 分，全中额外按 1 个命中计入，满分 100。</p>
-      </section>
+      <div style={{ textAlign: 'center', marginBottom: '24px' }}>
+        <div style={{ fontSize: '64px', marginBottom: '8px' }}>🎯</div>
+        <h2 style={{ fontSize: '32px', fontWeight: 'bold', margin: 0, background: 'linear-gradient(90deg, #40d88a, #00b86a)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
+          Bingo 猜词
+        </h2>
+        <p style={{ color: 'var(--ink)', margin: '8px 0 0 0', fontSize: '14px' }}>Guess the right words and get Bingo!</p>
+      </div>
+      
       {existing && <section className="statusBanner">该游戏已完成，本关得分 {existing.score}，不能重复提交。</section>}
+      
       <section className="wordBank">
         {questions.map((question) => (
           <button
@@ -96,20 +101,24 @@ export default function BingoPage() {
           </button>
         ))}
       </section>
-      <section className="bingoBoard demoBoard">
+      
+      <section className="bingoBoard demoBoard" style={{ marginTop: '20px' }}>
         {Array.from({ length: 9 }).map((_, index) => (
           <div className={selectedWords[index] ? "lit" : ""} key={index}>
             {selectedWords[index] || index + 1}
           </div>
         ))}
       </section>
+      
       <section className="statusPanel">
         <b>已选 {selectedWords.length}/9</b>
         <span>{message || "请从词库中选择 9 个词组成 Bingo 宫格。"}</span>
       </section>
+      
       <button className="primaryButton" type="button" disabled={Boolean(existing) || isOpen !== true || selectedWords.length !== 9} onClick={handleSubmit}>
         提交 Bingo
       </button>
+      
       <ResultModal open={modal.open} gameName="Bingo 猜词" roundScore={modal.score} totalScore={modal.total} rank={modal.rank} onBackLobby={() => router.push("/lobby")} />
     </Layout>
   );

@@ -140,16 +140,35 @@ export default function QuizPage() {
 
   return (
     <Layout title="Quick Quiz" eyebrow="GAME 02">
-      <Countdown seconds={seconds} total={QUIZ_SECONDS} />
+      <div style={{ textAlign: 'center', marginBottom: '24px' }}>
+        <div style={{ fontSize: '64px', marginBottom: '8px' }}>⚡</div>
+        <h2 style={{ fontSize: '32px', fontWeight: 'bold', margin: 0, background: 'linear-gradient(90deg, #40d88a, #00b86a)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
+          快问快答
+        </h2>
+        <p style={{ color: 'var(--ink)', margin: '8px 0 0 0', fontSize: '14px' }}>Quick questions and quick answers</p>
+      </div>
+      
+      <Countdown seconds={seconds} total={QUIZ_SECONDS} currentIndex={currentIndex} totalQuestions={questions.length} />
+      
       {existing && <section className="statusBanner">该游戏已完成，本关得分 {existing.score}，不能重复提交。</section>}
+      
       {currentQuestion && (
         <section className="questionStack">
-          <article className="questionCard">
-            <span>Q{currentIndex + 1} / {questions.length}</span>
-            <h3>{currentQuestion.title}</h3>
-            <div className="optionGrid">
-              {currentQuestion.options?.map((option) => (
-                <button className={selectedAnswer === option ? "selected" : ""} disabled={Boolean(existing) || isOpen !== true || seconds === 0} key={option} type="button" onClick={() => chooseAnswer(option)}>
+          <article className="questionCard" style={{ padding: '24px 20px' }}>
+            <h3 style={{ fontSize: '22px', fontWeight: 'bold', margin: '0 0 20px 0', lineHeight: '1.4' }}>
+              Question{currentIndex + 1}: select one from below 4 answers
+            </h3>
+            <div className="optionGrid" style={{ gap: '12px' }}>
+              {currentQuestion.options?.map((option, idx) => (
+                <button 
+                  className={selectedAnswer === option ? "selected" : ""} 
+                  disabled={Boolean(existing) || isOpen !== true || seconds === 0} 
+                  key={option} 
+                  type="button" 
+                  onClick={() => chooseAnswer(option)}
+                  style={{ padding: '14px 16px', fontSize: '16px', textAlign: 'left' }}
+                >
+                  <span style={{ fontWeight: 'bold', marginRight: '8px' }}>{String.fromCharCode(65 + idx)}.</span>
                   {option}
                 </button>
               ))}
@@ -157,10 +176,12 @@ export default function QuizPage() {
           </article>
         </section>
       )}
+      
       <section className="statusPanel">
         <b>已完成 {Object.keys(answers).length}/10</b>
         <span>{message || "每两题需要在一分钟之内完成，选择答案后手动进入下一题，时间到自动跳转。"}</span>
       </section>
+      
       {isLastQuestion ? (
         <button className="primaryButton" disabled={Boolean(existing) || isOpen !== true || !selectedAnswer || seconds === 0} type="button" onClick={submit}>
           提交 Quick Quiz
@@ -170,6 +191,7 @@ export default function QuizPage() {
           下一题
         </button>
       )}
+      
       <ResultModal open={modal.open} gameName="Quick Quiz" roundScore={modal.score} totalScore={modal.total} rank={modal.rank} onBackLobby={() => router.push("/lobby")} />
     </Layout>
   );
