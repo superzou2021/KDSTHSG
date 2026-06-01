@@ -24,7 +24,13 @@ export default function BingoPage() {
   }, [playerId, router]);
 
   useEffect(() => {
-    setExisting(playerId ? getGameResult(playerId, "bingo") : null);
+    async function loadExisting() {
+      if (playerId) {
+        const result = await getGameResult(playerId, "bingo");
+        setExisting(result);
+      }
+    }
+    loadExisting();
   }, [playerId]);
 
   const targetWords = useMemo(() => questions.filter((question) => question.correctAnswer).map((question) => question.title), [questions]);
@@ -51,7 +57,7 @@ export default function BingoPage() {
     });
   }
 
-  function handleSubmit() {
+  async function handleSubmit() {
     if (!playerId) return;
     if (isOpen !== true) {
       setMessage("该游戏暂未开放");
@@ -62,7 +68,7 @@ export default function BingoPage() {
       return;
     }
     try {
-      const outcome = submitGameResult({
+      const outcome = await submitGameResult({
         playerId,
         gameKey: "bingo",
         answers: { selectedWords, targetWords, correctCount },

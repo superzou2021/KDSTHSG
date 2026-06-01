@@ -25,7 +25,13 @@ export default function EliminationPage() {
   }, [playerId, router]);
 
   useEffect(() => {
-    setExisting(playerId ? getGameResult(playerId, "elimination") : null);
+    async function loadExisting() {
+      if (playerId) {
+        const result = await getGameResult(playerId, "elimination");
+        setExisting(result);
+      }
+    }
+    loadExisting();
   }, [playerId]);
 
   const currentQuestion = questions[currentIndex];
@@ -60,7 +66,7 @@ export default function EliminationPage() {
     setMessage("");
   }
 
-  function submit() {
+  async function submit() {
     if (!playerId) return;
     if (isOpen !== true) {
       setMessage("该游戏暂未开放");
@@ -71,7 +77,7 @@ export default function EliminationPage() {
       return;
     }
     try {
-      const outcome = submitGameResult({ playerId, gameKey: "elimination", answers, score });
+      const outcome = await submitGameResult({ playerId, gameKey: "elimination", answers, score });
       refresh();
       setExisting(outcome.result);
       setModal({ open: true, score: outcome.result.score, total: outcome.player.totalScore, rank: outcome.rank });

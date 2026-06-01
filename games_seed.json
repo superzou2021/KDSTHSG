@@ -1,0 +1,30 @@
+[
+  {
+    "key": "bingo",
+    "name": "Bingo 猜词",
+    "maxScore": 100,
+    "isOpen": false,
+    "order": 1
+  },
+  {
+    "key": "quiz",
+    "name": "Quick Quiz",
+    "maxScore": 100,
+    "isOpen": false,
+    "order": 2
+  },
+  {
+    "key": "story",
+    "name": "真假故事",
+    "maxScore": 100,
+    "isOpen": false,
+    "order": 3
+  },
+  {
+    "key": "elimination",
+    "name": "站立淘汰",
+    "maxScore": 100,
+    "isOpen": false,
+    "order": 4
+  }
+]

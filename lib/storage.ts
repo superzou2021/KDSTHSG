@@ -1,8 +1,11 @@
 "use client";
 
+import * as pbStorage from "@/lib/pb-storage";
 import { GAME_ORDER, GAMES, PLAYER_ID_KEY, PLAYER_PHONE_KEY, QUESTIONS, SEED_PLAYERS, STATE_KEY } from "@/lib/constants";
 import { getOfficeAverageRanking, getOfficeTop3, getPlayerRank, getPlayerRankingContext, getTop10Ranking } from "@/lib/ranking";
 import type { AppState, GameKey, GameResult, Player } from "@/types";
+
+let usePocketBase = false;
 
 function nowIso(): string {
   return new Date().toISOString();
@@ -16,6 +19,12 @@ function isBrowser(): boolean {
   return typeof window !== "undefined";
 }
 
+export async function checkBackend(): Promise<boolean> {
+  const available = await pbStorage.checkPocketBase();
+  usePocketBase = available;
+  return available;
+}
+
 export function getInitialState(): AppState {
   return {
     players: SEED_PLAYERS,
@@ -25,7 +34,7 @@ export function getInitialState(): AppState {
   };
 }
 
-export function loadState(): AppState {
+function loadStateLocal(): AppState {
   if (!isBrowser()) return getInitialState();
   const raw = window.localStorage.getItem(STATE_KEY);
   if (!raw) {
@@ -48,21 +57,39 @@ export function loadState(): AppState {
   }
 }
 
-export function saveState(state: AppState): void {
+function saveStateLocal(state: AppState): void {
   if (!isBrowser()) return;
   window.localStorage.setItem(STATE_KEY, JSON.stringify(state));
   window.dispatchEvent(new Event("annual-game-state-change"));
 }
 
-export function getCurrentPlayerId(): string | null {
+export async function loadState(): Promise<AppState> {
+  const available = await checkBackend();
+  if (available) {
+    return await pbStorage.loadStateFromPB();
+  }
+  return loadStateLocal();
+}
+
+export async function saveState(state: AppState): Promise<void> {
+  const available = await checkBackend();
+  if (available) {
+    await pbStorage.saveState(state);
+    return;
+  }
+  saveStateLocal(state);
+}
+
+export async function getCurrentPlayerId(): Promise<string | null> {
   if (!isBrowser()) return null;
   return window.localStorage.getItem(PLAYER_ID_KEY);
 }
 
-export function getCurrentPlayer(): Player | null {
-  const playerId = getCurrentPlayerId();
+export async function getCurrentPlayer(): Promise<Player | null> {
+  const playerId = await getCurrentPlayerId();
   if (!playerId) return null;
-  return loadState().players.find((player) => player.id === playerId) || null;
+  const state = await loadState();
+  return state.players.find((player) => player.id === playerId) || null;
 }
 
 export function validatePhone(phone: string): boolean {
@@ -77,7 +104,12 @@ export function validatePhone(phone: string): boolean {
   return true;
 }
 
-export function registerPlayer(input: { name: string; phone: string; office: string; team: string }): { player: Player; reused: boolean } {
+export async function registerPlayer(input: { name: string; phone: string; office: string; team: string }): Promise<{ player: Player; reused: boolean }> {
+  const available = await checkBackend();
+  if (available) {
+    return await pbStorage.registerPlayer(input);
+  }
+
   const name = input.name.trim().replace(/[<>]/g, "");
   const phone = input.phone.trim();
   const office = input.office.trim();
@@ -88,7 +120,7 @@ export function registerPlayer(input: { name: string; phone: string; office: str
   if (!office) throw new Error("请选择 Office");
   if (!team) throw new Error("请选择或填写 Team");
 
-  const state = loadState();
+  const state = loadStateLocal();
   const existing = state.players.find((player) => player.phone === phone);
   if (existing) {
     window.localStorage.setItem(PLAYER_ID_KEY, existing.id);
@@ -109,34 +141,53 @@ export function registerPlayer(input: { name: string; phone: string; office: str
     updated: nowIso()
   };
   state.players.push(player);
-  saveState(state);
+  saveStateLocal(state);
   window.localStorage.setItem(PLAYER_ID_KEY, player.id);
   window.localStorage.setItem(PLAYER_PHONE_KEY, phone);
   return { player, reused: false };
 }
 
-export function getGameResult(playerId: string, gameKey: GameKey): GameResult | null {
-  return loadState().gameResults.find((result) => result.player === playerId && result.gameKey === gameKey) || null;
+export async function getGameResult(playerId: string, gameKey: GameKey): Promise<GameResult | null> {
+  const available = await checkBackend();
+  if (available) {
+    return await pbStorage.getGameResult(playerId, gameKey);
+  }
+  const state = loadStateLocal();
+  return state.gameResults.find((result) => result.player === playerId && result.gameKey === gameKey) || null;
 }
 
-export function isGameOpen(gameKey: GameKey): boolean {
-  return Boolean(loadState().games.find((game) => game.key === gameKey)?.isOpen);
+export async function isGameOpen(gameKey: GameKey): Promise<boolean> {
+  const available = await checkBackend();
+  if (available) {
+    return await pbStorage.isGameOpen(gameKey);
+  }
+  const state = loadStateLocal();
+  return Boolean(state.games.find((game) => game.key === gameKey)?.isOpen);
 }
 
-export function toggleGameOpen(gameKey: GameKey): AppState {
-  const state = loadState();
+export async function toggleGameOpen(gameKey: GameKey): Promise<AppState> {
+  const available = await checkBackend();
+  if (available) {
+    return await pbStorage.toggleGameOpen(gameKey);
+  }
+  const state = loadStateLocal();
   state.games = state.games.map((game) => (game.key === gameKey ? { ...game, isOpen: !game.isOpen } : game));
-  saveState(state);
+  saveStateLocal(state);
   return state;
 }
 
-export function submitGameResult(input: {
+export async function submitGameResult(input: {
   playerId: string;
   gameKey: GameKey;
   answers: Record<string, unknown>;
   score: number;
-}): { result: GameResult; player: Player; rank: number } {
-  const state = loadState();
+}): Promise<{ result: GameResult; player: Player; rank: number }> {
+  const available = await checkBackend();
+  if (available) {
+    return await pbStorage.submitGameResult(input);
+  }
+
+  const state = loadStateLocal();
   if (!state.games.find((game) => game.key === input.gameKey)?.isOpen) {
     throw new Error("该游戏暂未开放");
   }
@@ -174,16 +225,17 @@ export function submitGameResult(input: {
 
   state.players[playerIndex] = player;
   state.gameResults = gameResults;
-  saveState(state);
+  saveStateLocal(state);
   return { result, player, rank: getPlayerRank(state.players, player.id) };
 }
 
-export function getQuestions(gameKey: GameKey) {
-  return loadState().questions.filter((question) => question.gameKey === gameKey && question.isActive).sort((a, b) => a.order - b.order);
+export async function getQuestions(gameKey: GameKey) {
+  const state = await loadState();
+  return state.questions.filter((question) => question.gameKey === gameKey && question.isActive).sort((a, b) => a.order - b.order);
 }
 
-export function getLobbySnapshot(playerId: string) {
-  const state = loadState();
+export async function getLobbySnapshot(playerId: string) {
+  const state = await loadState();
   const player = state.players.find((item) => item.id === playerId) || null;
   return {
     state,
@@ -193,8 +245,8 @@ export function getLobbySnapshot(playerId: string) {
   };
 }
 
-export function getRankingSnapshot(playerId?: string | null) {
-  const state = loadState();
+export async function getRankingSnapshot(playerId?: string | null) {
+  const state = await loadState();
   return {
     players: state.players,
     games: state.games,
@@ -206,10 +258,22 @@ export function getRankingSnapshot(playerId?: string | null) {
   };
 }
 
-export function resetDemoData(): void {
+export async function resetDemoData(): Promise<void> {
+  const available = await checkBackend();
+  if (available) {
+    await pbStorage.resetDemoData();
+    return;
+  }
+
   if (!isBrowser()) return;
   window.localStorage.removeItem(STATE_KEY);
   window.localStorage.removeItem(PLAYER_ID_KEY);
   window.localStorage.removeItem(PLAYER_PHONE_KEY);
-  loadState();
+  loadStateLocal();
 }
+
+export function subscribeToState(callback: () => void): () => void {
+  return pbStorage.subscribeToState(callback);
+}
+
+export { PLAYER_ID_KEY, PLAYER_PHONE_KEY };

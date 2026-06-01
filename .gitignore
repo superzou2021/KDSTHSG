@@ -14,3 +14,14 @@ dist/
 out/
 .DS_Store
 Thumbs.db
+
+# PocketBase
+pocketbase.exe
+pocketbase_*.exe
+pb_data/
+*.db
+*.db-shm
+*.db-wal
+
+# Windows
+desktop.ini

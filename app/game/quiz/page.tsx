@@ -36,7 +36,13 @@ export default function QuizPage() {
   }, [playerId, router]);
 
   useEffect(() => {
-    setExisting(playerId ? getGameResult(playerId, "quiz") : null);
+    async function loadExisting() {
+      if (playerId) {
+        const result = await getGameResult(playerId, "quiz");
+        setExisting(result);
+      }
+    }
+    loadExisting();
   }, [playerId]);
 
   useEffect(() => {
@@ -53,14 +59,16 @@ export default function QuizPage() {
     if (lastQuestion) {
       // 如果是最后一题，直接提交
       if (playerId) {
-        try {
-          const outcome = submitGameResult({ playerId, gameKey: "quiz", answers, score });
-          refresh();
-          setExisting(outcome.result);
-          setModal({ open: true, score: outcome.result.score, total: outcome.player.totalScore, rank: outcome.rank });
-        } catch {
-          // 提交失败也不处理
-        }
+        (async () => {
+          try {
+            const outcome = await submitGameResult({ playerId, gameKey: "quiz", answers, score });
+            refresh();
+            setExisting(outcome.result);
+            setModal({ open: true, score: outcome.result.score, total: outcome.player.totalScore, rank: outcome.rank });
+          } catch {
+            // 提交失败也不处理
+          }
+        })();
       }
     } else {
       // 计算下一组题目的开始位置
@@ -75,14 +83,16 @@ export default function QuizPage() {
       } else {
         // 没有下一组，直接提交
         if (playerId) {
-          try {
-            const outcome = submitGameResult({ playerId, gameKey: "quiz", answers, score });
-            refresh();
-            setExisting(outcome.result);
-            setModal({ open: true, score: outcome.result.score, total: outcome.player.totalScore, rank: outcome.rank });
-          } catch {
-            // 提交失败也不处理
-          }
+          (async () => {
+            try {
+              const outcome = await submitGameResult({ playerId, gameKey: "quiz", answers, score });
+              refresh();
+              setExisting(outcome.result);
+              setModal({ open: true, score: outcome.result.score, total: outcome.player.totalScore, rank: outcome.rank });
+            } catch {
+              // 提交失败也不处理
+            }
+          })();
         }
       }
     }
@@ -118,7 +128,7 @@ export default function QuizPage() {
     setMessage("");
   }
 
-  function submit() {
+  async function submit() {
     if (!playerId) return;
     if (isOpen !== true) {
       setMessage("该游戏暂未开放");
@@ -129,7 +139,7 @@ export default function QuizPage() {
       return;
     }
     try {
-      const outcome = submitGameResult({ playerId, gameKey: "quiz", answers, score });
+      const outcome = await submitGameResult({ playerId, gameKey: "quiz", answers, score });
       refresh();
       setExisting(outcome.result);
       setModal({ open: true, score: outcome.result.score, total: outcome.player.totalScore, rank: outcome.rank });

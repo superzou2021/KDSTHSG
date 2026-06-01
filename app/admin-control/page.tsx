@@ -19,20 +19,19 @@ export default function AdminControlPage() {
     }));
   }, [state.gameResults]);
 
-  function handleToggle(key: GameKey) {
-    const nextState = toggleGameOpen(key);
-    refresh();
+  async function handleToggle(key: GameKey) {
+    const nextState = await toggleGameOpen(key);
     const game = nextState.games.find((item) => item.key === key);
     setExportText(`${game?.name || key} 已${game?.isOpen ? "开启" : "关闭"}`);
   }
 
-  function handleExport() {
-    setExportText(JSON.stringify(loadState(), null, 2));
+  async function handleExport() {
+    const state = await loadState();
+    setExportText(JSON.stringify(state, null, 2));
   }
 
-  function handleReset() {
-    resetDemoData();
-    refresh();
+  async function handleReset() {
+    await resetDemoData();
     setExportText("");
   }
 

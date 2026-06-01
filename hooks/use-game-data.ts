@@ -14,41 +14,46 @@ import {
   loadState,
   registerPlayer,
   submitGameResult,
-  toggleGameOpen
+  toggleGameOpen,
+  subscribeToState
 } from "@/lib/storage";
 
 export function useAppState() {
   const [state, setState] = useState<AppState>(getInitialState());
-  const refresh = useCallback(() => setState(loadState()), []);
+  const [loading, setLoading] = useState(true);
+
+  const refresh = useCallback(async () => {
+    const newState = await loadState();
+    setState(newState);
+    setLoading(false);
+  }, []);
 
   useEffect(() => {
     refresh();
-    window.addEventListener("annual-game-state-change", refresh);
-    window.addEventListener("storage", refresh);
-    return () => {
-      window.removeEventListener("annual-game-state-change", refresh);
-      window.removeEventListener("storage", refresh);
-    };
+    const unsubscribe = subscribeToState(refresh);
+    return unsubscribe;
   }, [refresh]);
 
-  return { state, refresh };
+  return { state, refresh, loading };
 }
 
 export function useCurrentPlayer() {
   const [player, setPlayer] = useState<Player | null>(null);
-  const refresh = useCallback(() => setPlayer(getCurrentPlayer()), []);
+  const [loading, setLoading] = useState(true);
+
+  const refresh = useCallback(async () => {
+    const p = await getCurrentPlayer();
+    setPlayer(p);
+    setLoading(false);
+  }, []);
 
   useEffect(() => {
     refresh();
-    window.addEventListener("annual-game-state-change", refresh);
-    window.addEventListener("storage", refresh);
-    return () => {
-      window.removeEventListener("annual-game-state-change", refresh);
-      window.removeEventListener("storage", refresh);
-    };
+    const unsubscribe = subscribeToState(refresh);
+    return unsubscribe;
   }, [refresh]);
 
-  return { player, playerId: getCurrentPlayerId(), refresh };
+  return { player, playerId: getCurrentPlayerId(), refresh, loading };
 }
 
 export function useRegisterPlayer() {
@@ -56,27 +61,36 @@ export function useRegisterPlayer() {
 }
 
 export function useQuestions(gameKey: GameKey) {
-  const [questions, setQuestions] = useState(() => getQuestions(gameKey));
+  const [questions, setQuestions] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const refresh = useCallback(async () => {
+    const q = await getQuestions(gameKey);
+    setQuestions(q);
+    setLoading(false);
+  }, [gameKey]);
 
   useEffect(() => {
-    setQuestions(getQuestions(gameKey));
-  }, [gameKey]);
+    refresh();
+  }, [refresh]);
 
   return questions;
 }
 
 export function useGameStatus(gameKey: GameKey) {
   const [open, setOpen] = useState<boolean | null>(null);
-  const refresh = useCallback(() => setOpen(isGameOpen(gameKey)), [gameKey]);
+  const [loading, setLoading] = useState(true);
+
+  const refresh = useCallback(async () => {
+    const isOpenVal = await isGameOpen(gameKey);
+    setOpen(isOpenVal);
+    setLoading(false);
+  }, [gameKey]);
 
   useEffect(() => {
     refresh();
-    window.addEventListener("annual-game-state-change", refresh);
-    window.addEventListener("storage", refresh);
-    return () => {
-      window.removeEventListener("annual-game-state-change", refresh);
-      window.removeEventListener("storage", refresh);
-    };
+    const unsubscribe = subscribeToState(refresh);
+    return unsubscribe;
   }, [refresh]);
 
   return open;
@@ -88,52 +102,70 @@ export function useSubmitGameResult() {
 
 export function useExistingResult(playerId: string | null | undefined, gameKey: GameKey) {
   const [exists, setExists] = useState(false);
-  useEffect(() => {
-    setExists(Boolean(playerId && getGameResult(playerId, gameKey)));
+  const [loading, setLoading] = useState(true);
+
+  const refresh = useCallback(async () => {
+    if (playerId) {
+      const result = await getGameResult(playerId, gameKey);
+      setExists(Boolean(result));
+    }
+    setLoading(false);
   }, [playerId, gameKey]);
+
+  useEffect(() => {
+    refresh();
+    const unsubscribe = subscribeToState(refresh);
+    return unsubscribe;
+  }, [refresh]);
+
   return exists;
 }
 
 export function useLobbySnapshot(playerId: string | null | undefined) {
-  const [snapshot, setSnapshot] = useState(() => (playerId ? getLobbySnapshot(playerId) : null));
-  const refresh = useCallback(() => {
-    setSnapshot(playerId ? getLobbySnapshot(playerId) : null);
+  const [snapshot, setSnapshot] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+
+  const refresh = useCallback(async () => {
+    if (playerId) {
+      const s = await getLobbySnapshot(playerId);
+      setSnapshot(s);
+    }
+    setLoading(false);
   }, [playerId]);
 
   useEffect(() => {
     refresh();
-    window.addEventListener("annual-game-state-change", refresh);
-    window.addEventListener("storage", refresh);
-    return () => {
-      window.removeEventListener("annual-game-state-change", refresh);
-      window.removeEventListener("storage", refresh);
-    };
+    const unsubscribe = subscribeToState(refresh);
+    return unsubscribe;
   }, [refresh]);
 
-  return { snapshot, refresh };
+  return { snapshot, refresh, loading };
 }
 
 export function useRanking(playerId?: string | null, intervalMs?: number) {
-  const [ranking, setRanking] = useState(() => getRankingSnapshot(playerId));
-  const refresh = useCallback(() => setRanking(getRankingSnapshot(playerId)), [playerId]);
+  const [ranking, setRanking] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+
+  const refresh = useCallback(async () => {
+    const r = await getRankingSnapshot(playerId);
+    setRanking(r);
+    setLoading(false);
+  }, [playerId]);
 
   useEffect(() => {
     refresh();
-    window.addEventListener("annual-game-state-change", refresh);
-    window.addEventListener("storage", refresh);
-    if (!intervalMs) return () => {
-      window.removeEventListener("annual-game-state-change", refresh);
-      window.removeEventListener("storage", refresh);
-    };
+    const unsubscribe = subscribeToState(refresh);
+
+    if (!intervalMs) return unsubscribe;
+
     const timer = window.setInterval(refresh, intervalMs);
     return () => {
+      unsubscribe();
       window.clearInterval(timer);
-      window.removeEventListener("annual-game-state-change", refresh);
-      window.removeEventListener("storage", refresh);
     };
   }, [refresh, intervalMs]);
 
-  return { ranking, refresh };
+  return { ranking, refresh, loading };
 }
 
 export function useAdminActions() {

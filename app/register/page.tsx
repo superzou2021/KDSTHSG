@@ -24,7 +24,7 @@ export default function RegisterPage() {
     setForm((current) => ({ ...current, [field]: processedValue }));
   }
 
-  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (isSubmitting) return;
     
@@ -32,7 +32,7 @@ export default function RegisterPage() {
     setIsSubmitting(true);
     
     try {
-      const result = register(form);
+      const result = await register(form);
       setMessage(result.reused ? "该手机号已参与，已加载历史身份。" : "注册成功，正在进入大厅。");
       router.push("/lobby");
     } catch (error) {
