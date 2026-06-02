@@ -5,11 +5,14 @@ import { useEffect, useMemo, useState } from "react";
 import Countdown from "@/components/Countdown";
 import Layout from "@/components/Layout";
 import ResultModal from "@/components/ResultModal";
+import QuizStartModal from "@/components/QuizStartModal";
 import { calculateQuizScore } from "@/lib/scoring";
 import { getGameResult } from "@/lib/storage";
-import { useCurrentPlayer, useGameStatus, useQuestions, useSubmitGameResult } from "@/hooks/use-game-data";
+import { useAppState, useCurrentPlayer, useGameStatus, useQuestions, useSubmitGameResult } from "@/hooks/use-game-data";
 
-const QUIZ_SECONDS = 60;
+const GROUP_SECONDS = 60; // 每组1分钟
+const TOTAL_GROUPS = 5; // 共5个板块
+const QUESTIONS_PER_GROUP = 2; // 每板块2题
 
 export default function QuizPage() {
   const router = useRouter();
@@ -17,21 +20,36 @@ export default function QuizPage() {
   const questions = useQuestions("quiz");
   const submitGameResult = useSubmitGameResult();
   const isOpen = useGameStatus("quiz");
-  const [currentIndex, setCurrentIndex] = useState(0);
+  const { state } = useAppState();
+  const quizGame = state.games.find(g => g.key === "quiz");
+  const currentGroup = quizGame?.quizCurrentGroup || 0;
+  
+  const [hasStarted, setHasStarted] = useState(false);
+  const [localGroupIndex, setLocalGroupIndex] = useState(0);
+  const [questionIndexInGroup, setQuestionIndexInGroup] = useState(0);
   const [answers, setAnswers] = useState<Record<string, string>>({});
-  const [seconds, setSeconds] = useState(QUIZ_SECONDS);
+  const [seconds, setSeconds] = useState(GROUP_SECONDS);
   const [existing, setExisting] = useState<Awaited<ReturnType<typeof getGameResult>>>(null);
   const [existingLoading, setExistingLoading] = useState(true);
   const [modal, setModal] = useState({ open: false, score: 0, total: 0, rank: 0 });
   const [isLeaving, setIsLeaving] = useState(false);
   const [message, setMessage] = useState("");
+  const [waitingForNextGroup, setWaitingForNextGroup] = useState(false);
+  const [showStartModal, setShowStartModal] = useState(true);
 
-  // 先定义所有计算变量
-  const currentQuestion = questions[currentIndex];
+  // 计算当前题目的索引
+  const currentQuestionIndex = localGroupIndex * QUESTIONS_PER_GROUP + questionIndexInGroup;
+  const currentQuestion = questions[currentQuestionIndex];
   const selectedAnswer = currentQuestion ? answers[currentQuestion.id] : "";
-  const isLastQuestion = currentIndex === questions.length - 1;
+  
+  // 计算正确数和分数
   const correctCount = useMemo(() => questions.filter((question) => answers[question.id] === question.correctAnswer).length, [answers, questions]);
   const score = calculateQuizScore(correctCount);
+
+  // 检查是否完成当前组
+  const isGroupComplete = (questionIndexInGroup + 1) >= QUESTIONS_PER_GROUP;
+  // 检查是否是最后一组
+  const isLastGroup = localGroupIndex >= TOTAL_GROUPS - 1;
 
   useEffect(() => {
     if (playerId === null) router.push("/register");
@@ -62,58 +80,37 @@ export default function QuizPage() {
     };
   }, [playerId]);
 
+  // 监听后台的板块更新
   useEffect(() => {
-    if (modal.open || existing || isOpen !== true) return undefined;
+    if (!hasStarted) return;
+    // 当后台更新了板块且本地还没到那个板块时，更新本地并重置等待状态
+    if (currentGroup > localGroupIndex) {
+      setLocalGroupIndex(currentGroup);
+      setQuestionIndexInGroup(0);
+      setWaitingForNextGroup(false);
+      setSeconds(GROUP_SECONDS);
+    }
+  }, [currentGroup, localGroupIndex, hasStarted]);
+
+  // 倒计时逻辑
+  useEffect(() => {
+    if (!hasStarted || waitingForNextGroup || modal.open || existing || isOpen !== true) return;
     const timer = window.setInterval(() => setSeconds((value) => Math.max(0, value - 1)), 1000);
     return () => window.clearInterval(timer);
-  }, [modal.open, existing, isOpen]);
+  }, [hasStarted, waitingForNextGroup, modal.open, existing, isOpen]);
 
-  // 倒计时结束时自动跳转下一组题目
+  // 时间到逻辑
   useEffect(() => {
-    if (seconds > 0 || modal.open || existing || isOpen !== true) return;
+    if (seconds > 0 || !hasStarted || waitingForNextGroup || modal.open || existing || isOpen !== true) return;
     
-    const lastQuestion = currentIndex === questions.length - 1;
-    if (lastQuestion) {
-      // 如果是最后一题，直接提交
-      if (playerId) {
-        (async () => {
-          try {
-            const outcome = await submitGameResult({ playerId, gameKey: "quiz", answers, score });
-            refresh();
-            setExisting(outcome.result);
-            setModal({ open: true, score: outcome.result.score, total: outcome.player.totalScore, rank: outcome.rank });
-          } catch {
-            // 提交失败也不处理
-          }
-        })();
-      }
+    if (isLastGroup && isGroupComplete) {
+      submitAllAnswers();
     } else {
-      // 计算下一组题目的开始位置
-      const currentGroupStart = Math.floor(currentIndex / 2) * 2;
-      const nextGroupStart = currentGroupStart + 2;
-      
-      if (nextGroupStart < questions.length) {
-        // 跳转到下一组
-        setCurrentIndex(nextGroupStart);
-        setSeconds(QUIZ_SECONDS);
-        setMessage("时间到，已自动跳转下一组题目");
-      } else {
-        // 没有下一组，直接提交
-        if (playerId) {
-          (async () => {
-            try {
-              const outcome = await submitGameResult({ playerId, gameKey: "quiz", answers, score });
-              refresh();
-              setExisting(outcome.result);
-              setModal({ open: true, score: outcome.result.score, total: outcome.player.totalScore, rank: outcome.rank });
-            } catch {
-              // 提交失败也不处理
-            }
-          })();
-        }
-      }
+      // 进入等待状态
+      setWaitingForNextGroup(true);
+      setMessage("等待后台开启下一板块...");
     }
-  }, [seconds]); // 简化依赖数组，只监听 seconds
+  }, [seconds, hasStarted, waitingForNextGroup, modal.open, existing, isOpen, isLastGroup, isGroupComplete]);
 
   const shouldLeaveClosedGame = isOpen === false && !existingLoading && !existing && !modal.open;
 
@@ -122,27 +119,13 @@ export default function QuizPage() {
     router.push("/lobby");
   }
 
-  if (isLeaving) {
-    return (
-      <Layout title="Quick Quiz" eyebrow="GAME 02">
-        <section className="statusBanner">正在跳转...</section>
-      </Layout>
-    );
-  }
-
-  if (shouldLeaveClosedGame) {
-    return (
-      <Layout title="Quick Quiz" eyebrow="GAME 02">
-        <section className="statusBanner">正在同步游戏开放状态...</section>
-        <button className="primaryButton" type="button" onClick={goLobby}>
-          回到大厅
-        </button>
-      </Layout>
-    );
+  async function handleStart() {
+    setShowStartModal(false);
+    setHasStarted(true);
   }
 
   function chooseAnswer(option: string) {
-    if (!currentQuestion || isOpen !== true || existing || seconds === 0) return;
+    if (!currentQuestion || isOpen !== true || existing || waitingForNextGroup || !hasStarted) return;
     setAnswers((current) => ({ ...current, [currentQuestion.id]: option }));
     setMessage("");
   }
@@ -152,24 +135,20 @@ export default function QuizPage() {
       setMessage("请先选择本题答案");
       return;
     }
-    // 每两题重置计时器
-    if ((currentIndex + 1) % 2 === 0) {
-      setSeconds(QUIZ_SECONDS);
+    if (isGroupComplete) {
+      if (isLastGroup) {
+        submitAllAnswers();
+      } else {
+        setWaitingForNextGroup(true);
+        setMessage("等待后台开启下一板块...");
+      }
+    } else {
+      setQuestionIndexInGroup((prev) => prev + 1);
     }
-    setCurrentIndex((index) => Math.min(index + 1, questions.length - 1));
-    setMessage("");
   }
 
-  async function submit() {
+  async function submitAllAnswers() {
     if (!playerId) return;
-    if (isOpen !== true) {
-      setMessage("该游戏暂未开放");
-      return;
-    }
-    if (!selectedAnswer) {
-      setMessage("请完成当前题目后再提交");
-      return;
-    }
     try {
       const outcome = await submitGameResult({ playerId, gameKey: "quiz", answers, score });
       refresh();
@@ -180,33 +159,52 @@ export default function QuizPage() {
     }
   }
 
+  if (isLeaving) {
+    return (
+      <Layout title="Sector Quiz" eyebrow="GAME 02">
+        <section className="statusBanner">正在跳转...</section>
+      </Layout>
+    );
+  }
+
+  if (shouldLeaveClosedGame) {
+    return (
+      <Layout title="Sector Quiz" eyebrow="GAME 02">
+        <section className="statusBanner">正在同步游戏开放状态...</section>
+        <button className="primaryButton" type="button" onClick={goLobby}>
+          回到大厅
+        </button>
+      </Layout>
+    );
+  }
+
   return (
-    <Layout title="Quick Quiz" eyebrow="GAME 02">
+    <Layout title="Sector Quiz" eyebrow="GAME 02">
       <div style={{ textAlign: 'center', marginBottom: '24px' }}>
         <div style={{ fontSize: '64px', marginBottom: '8px' }}>⚡</div>
         <h2 style={{ fontSize: '32px', fontWeight: 'bold', margin: 0, background: 'linear-gradient(90deg, #40d88a, #00b86a)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
-          快问快答
+          Sector Quiz
         </h2>
-        <p style={{ color: 'var(--ink)', margin: '8px 0 0 0', fontSize: '14px' }}>Quick questions and quick answers</p>
+        <p style={{ color: 'var(--ink)', margin: '8px 0 0 0', fontSize: '14px' }}>第 {localGroupIndex + 1} 板块 / 共 {TOTAL_GROUPS} 板块</p>
       </div>
-      
-      <Countdown seconds={seconds} total={QUIZ_SECONDS} currentIndex={currentIndex} totalQuestions={questions.length} />
-      
-      {!existingLoading && existing && <section className="statusBanner">该游戏已完成，本关得分 {existing.score}，不能重复提交。</section>}
-      
-      {currentQuestion && (
+
+      {hasStarted && !waitingForNextGroup && <Countdown seconds={seconds} total={GROUP_SECONDS} currentIndex={currentQuestionIndex} totalQuestions={TOTAL_GROUPS * QUESTIONS_PER_GROUP} />}
+
+      {!existingLoading && existing && <section className="statusBanner">该游戏已完成，本关得分 {existing.score}，不能重复提交</section>}
+
+      {hasStarted && currentQuestion && !waitingForNextGroup && (
         <section className="questionStack">
           <article className="questionCard" style={{ padding: '24px 20px' }}>
             <h3 style={{ fontSize: '22px', fontWeight: 'bold', margin: '0 0 20px 0', lineHeight: '1.4' }}>
-              Question{currentIndex + 1}: select one from below 4 answers
+              第 {questionIndexInGroup + 1} 题：{currentQuestion.title}
             </h3>
             <div className="optionGrid" style={{ gap: '12px' }}>
               {currentQuestion.options?.map((option, idx) => (
-                <button 
-                  className={selectedAnswer === option ? "selected" : ""} 
-                  disabled={Boolean(existing) || isOpen !== true || seconds === 0} 
-                  key={option} 
-                  type="button" 
+                <button
+                  className={selectedAnswer === option ? "selected" : ""}
+                  disabled={Boolean(existing) || isOpen !== true || waitingForNextGroup || !hasStarted}
+                  key={option}
+                  type="button"
                   onClick={() => chooseAnswer(option)}
                   style={{ padding: '14px 16px', fontSize: '16px', textAlign: 'left' }}
                 >
@@ -218,23 +216,41 @@ export default function QuizPage() {
           </article>
         </section>
       )}
-      
-      <section className="statusPanel">
-        <b>已完成 {Object.keys(answers).length}/10</b>
-        <span>{message || "每两题需要在一分钟之内完成，选择答案后手动进入下一题，时间到自动跳转。"}</span>
-      </section>
-      
-      {isLastQuestion ? (
-        <button className="primaryButton" disabled={Boolean(existing) || isOpen !== true || !selectedAnswer || seconds === 0} type="button" onClick={submit}>
-          提交 Quick Quiz
-        </button>
-      ) : (
-        <button className="primaryButton" disabled={Boolean(existing) || isOpen !== true || !selectedAnswer || seconds === 0} type="button" onClick={goNext}>
-          下一题
+
+      {waitingForNextGroup && (
+        <section className="statusBanner" style={{ margin: '20px 0', textAlign: 'center' }}>
+          <div style={{ fontSize: '48px', marginBottom: '16px' }}>⏳</div>
+          <p>本板块已完成！</p>
+          <p style={{ color: 'var(--muted)', marginTop: '8px' }}>{message}</p>
+        </section>
+      )}
+
+      {hasStarted && !waitingForNextGroup && (
+        <section className="statusPanel">
+          <b>已完成 {Object.keys(answers).length}/{TOTAL_GROUPS * QUESTIONS_PER_GROUP}</b>
+          <span>{message || "选择答案后点击继续"}</span>
+        </section>
+      )}
+
+      {hasStarted && !waitingForNextGroup && currentQuestion && (
+        <button className="primaryButton" disabled={Boolean(existing) || isOpen !== true || !selectedAnswer} type="button" onClick={goNext}>
+          {isGroupComplete && isLastGroup ? "提交成绩" : isGroupComplete ? "完成本板块" : "继续"}
         </button>
       )}
-      
-      <ResultModal open={modal.open} gameName="Quick Quiz" roundScore={modal.score} totalScore={modal.total} rank={modal.rank} onBackLobby={goLobby} />
+
+      <QuizStartModal
+        open={showStartModal && !existing && isOpen === true}
+        onStart={handleStart}
+      />
+
+      <ResultModal
+        open={modal.open}
+        gameName="Sector Quiz"
+        roundScore={modal.score}
+        totalScore={modal.total}
+        rank={modal.rank}
+        onBackLobby={goLobby}
+      />
     </Layout>
   );
 }

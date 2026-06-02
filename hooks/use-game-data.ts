@@ -16,6 +16,7 @@ import {
   submitGameResult,
   toggleGameOpen,
   triggerBingoScore,
+  advanceQuizGroup,
   subscribeToState
 } from "@/lib/storage";
 
@@ -228,5 +229,5 @@ export function useRanking(playerId?: string | null, intervalMs?: number) {
 }
 
 export function useAdminActions() {
-  return { toggleGameOpen, triggerBingoScore };
+  return { toggleGameOpen, triggerBingoScore, advanceQuizGroup };
 }

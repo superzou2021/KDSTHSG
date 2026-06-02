@@ -9,7 +9,7 @@ import type { GameKey } from "@/types";
 
 export default function AdminControlPage() {
   const { state, refresh } = useAppState();
-  const { toggleGameOpen, triggerBingoScore } = useAdminActions();
+  const { toggleGameOpen, triggerBingoScore, advanceQuizGroup } = useAdminActions();
   const [exportText, setExportText] = useState("");
 
   const completion = useMemo(() => {
@@ -22,6 +22,10 @@ export default function AdminControlPage() {
   const bingoCompletionCount = completion.find((item) => item.key === "bingo")?.count || 0;
   const pendingBingoCount = state.gameResults.filter((result) => result.gameKey === "bingo" && result.pendingBingoScore).length;
   const bingoScoreTriggered = Boolean(pendingBingoCount === 0 && (bingoGame?.bingoScored || (bingoCompletionCount > 0 && bingoGame?.isOpen === false)));
+  const quizGame = state.games.find(g => g.key === "quiz");
+  const quizCurrentGroup = quizGame?.quizCurrentGroup || 0;
+  const quizCompleted = quizCurrentGroup >= 5; // 5个板块（每组2题）
+  const quizCompletionCount = completion.find((item) => item.key === "quiz")?.count || 0;
 
   async function handleToggle(key: GameKey) {
     const nextState = await toggleGameOpen(key);
@@ -37,6 +41,16 @@ export default function AdminControlPage() {
       await refresh();
     } catch (error) {
       setExportText(error instanceof Error ? `Bingo 判分失败：${error.message}` : "Bingo 判分失败");
+    }
+  }
+
+  async function handleQuizNext() {
+    try {
+      await advanceQuizGroup();
+      setExportText(`Sector Quiz 已进入第 ${quizCurrentGroup + 1} 板块！`);
+      await refresh();
+    } catch (error) {
+      setExportText(error instanceof Error ? `Sector Quiz 操作失败：${error.message}` : "Sector Quiz 操作失败");
     }
   }
 
@@ -105,6 +119,25 @@ export default function AdminControlPage() {
             onClick={handleBingoScore}
           >
             {bingoScoreTriggered ? "已触发" : "触发判分"}
+          </button>
+        </div>
+      </section>
+      <section className="sectionBlock">
+        <h2>Sector Quiz 控制</h2>
+        <div className="adminRow" style={{ justifyContent: 'space-between', alignItems: 'center' }}>
+          <div>
+            <b>板块控制</b>
+            <span>
+              当前板块：第 {quizCurrentGroup + 1} 板块 / 完成人数 {quizCompletionCount}
+            </span>
+          </div>
+          <button
+            className="primaryButton smallButton"
+            type="button"
+            disabled={quizCompleted || !quizGame?.isOpen}
+            onClick={handleQuizNext}
+          >
+            {quizCompleted ? "游戏完成" : "下一题组"}
           </button>
         </div>
       </section>

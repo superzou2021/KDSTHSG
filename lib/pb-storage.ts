@@ -62,7 +62,8 @@ function mapGameRecord(record: any): Game {
     maxScore: record.maxScore,
     isOpen: Boolean(record.isOpen),
     order: record.order,
-    bingoScored: Boolean(record.bingoScored)
+    bingoScored: Boolean(record.bingoScored),
+    quizCurrentGroup: record.quizCurrentGroup || 0
   };
 }
 
@@ -338,7 +339,13 @@ export async function toggleGameOpen(gameKey: GameKey): Promise<AppState> {
   const newGames = state.games.map((game) => {
     if (game.key !== gameKey) return game;
     const isOpen = !game.isOpen;
-    return game.key === "bingo" ? { ...game, isOpen, bingoScored: isOpen ? false : game.bingoScored } : { ...game, isOpen };
+    if (game.key === "bingo") {
+      return { ...game, isOpen, bingoScored: isOpen ? false : game.bingoScored };
+    }
+    if (game.key === "quiz" && isOpen) {
+      return { ...game, isOpen, quizCurrentGroup: 0 };
+    }
+    return { ...game, isOpen };
   });
   const newState = { ...state, games: newGames };
 
@@ -348,7 +355,13 @@ export async function toggleGameOpen(gameKey: GameKey): Promise<AppState> {
     for (const game of newGames) {
       const existing = list.find(g => g.key === game.key);
       if (existing) {
-        const data = game.key === "bingo" ? { isOpen: game.isOpen, bingoScored: Boolean(game.bingoScored) } : { isOpen: game.isOpen };
+        let data: Record<string, any> = { isOpen: game.isOpen };
+        if (game.key === "bingo") {
+          data.bingoScored = Boolean(game.bingoScored);
+        }
+        if (game.key === "quiz") {
+          data.quizCurrentGroup = game.quizCurrentGroup || 0;
+        }
         await pb.collection("games").update(existing.id, data);
       }
     }
@@ -383,6 +396,29 @@ export async function triggerBingoScore(): Promise<AppState> {
     const bingo = list.find(g => g.key === "bingo");
     if (bingo) {
       await pb.collection("games").update(bingo.id, { isOpen: false, bingoScored: true });
+    }
+  }
+
+  await saveState(newState);
+  return available ? await loadState() : newState;
+}
+
+export async function advanceQuizGroup(): Promise<AppState> {
+  const state = await loadState();
+  const newGames = state.games.map((game) => {
+    if (game.key !== "quiz") return game;
+    const nextGroup = (game.quizCurrentGroup || 0) + 1;
+    return { ...game, quizCurrentGroup: nextGroup };
+  });
+  const newState = { ...state, games: newGames };
+
+  const available = await checkPocketBase();
+  if (available) {
+    const list = await pb.collection("games").getFullList();
+    const quiz = list.find(g => g.key === "quiz");
+    if (quiz) {
+      const nextGroup = (quiz.quizCurrentGroup || 0) + 1;
+      await pb.collection("games").update(quiz.id, { quizCurrentGroup: nextGroup });
     }
   }
 

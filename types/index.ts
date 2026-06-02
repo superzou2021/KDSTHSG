@@ -22,6 +22,7 @@ export type Game = {
   isOpen: boolean;
   order: number;
   bingoScored?: boolean;
+  quizCurrentGroup?: number;
 };
 
 export type Question = {

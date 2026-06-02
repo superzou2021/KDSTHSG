@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import Layout from "@/components/Layout";
 import ResultModal from "@/components/ResultModal";
+import EliminationModal from "@/components/EliminationModal";
 import { calculateEliminationScore } from "@/lib/scoring";
 import { getGameResult } from "@/lib/storage";
 import { useCurrentPlayer, useGameStatus, useQuestions, useSubmitGameResult } from "@/hooks/use-game-data";
@@ -18,7 +19,8 @@ export default function EliminationPage() {
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [existing, setExisting] = useState<Awaited<ReturnType<typeof getGameResult>>>(null);
   const [existingLoading, setExistingLoading] = useState(true);
-  const [modal, setModal] = useState({ open: false, score: 0, total: 0, rank: 0 });
+  const [modal, setModal] = useState({ open: false, score: 0, total: 0, rank: 0, isEliminated: false });
+  const [eliminationModal, setEliminationModal] = useState({ open: false, type: "correct" as "correct" | "eliminated" });
   const [message, setMessage] = useState("");
 
   useEffect(() => {
@@ -67,39 +69,51 @@ export default function EliminationPage() {
     );
   }
 
-  function chooseAnswer(option: string) {
+  async function chooseAnswer(option: string) {
     if (!currentQuestion || isOpen !== true || existing) return;
-    setAnswers((current) => ({ ...current, [currentQuestion.id]: option }));
+
+    const newAnswers = { ...answers, [currentQuestion.id]: option };
+    setAnswers(newAnswers);
     setMessage("");
+
+    const isCorrect = option === currentQuestion.correctAnswer;
+    const newCorrectCount = questions.filter((q) => {
+      const answer = newAnswers[q.id];
+      return answer === q.correctAnswer;
+    }).length;
+    const newScore = calculateEliminationScore(newCorrectCount);
+
+    if (isCorrect) {
+      if (isLastQuestion) {
+        if (!playerId) return;
+        try {
+          const outcome = await submitGameResult({ playerId, gameKey: "elimination", answers: newAnswers, score: newScore });
+          refresh();
+          setExisting(outcome.result);
+          setModal({ open: true, score: outcome.result.score, total: outcome.player.totalScore, rank: outcome.rank, isEliminated: false });
+        } catch (error) {
+          setMessage(error instanceof Error ? error.message : "提交失败");
+        }
+      } else {
+        setEliminationModal({ open: true, type: "correct" });
+      }
+    } else {
+      if (!playerId) return;
+      try {
+        const outcome = await submitGameResult({ playerId, gameKey: "elimination", answers: newAnswers, score: newScore });
+        refresh();
+        setExisting(outcome.result);
+        setModal({ open: true, score: outcome.result.score, total: outcome.player.totalScore, rank: outcome.rank, isEliminated: true });
+      } catch (error) {
+        setMessage(error instanceof Error ? error.message : "提交失败");
+      }
+    }
   }
 
   function goNext() {
-    if (!selectedAnswer) {
-      setMessage("请先选择本题答案");
-      return;
-    }
     setCurrentIndex((index) => Math.min(index + 1, questions.length - 1));
+    setEliminationModal({ open: false, type: "correct" });
     setMessage("");
-  }
-
-  async function submit() {
-    if (!playerId) return;
-    if (isOpen !== true) {
-      setMessage("该游戏暂未开放");
-      return;
-    }
-    if (!selectedAnswer || Object.keys(answers).length < questions.length) {
-      setMessage("请完成当前题目后再提交");
-      return;
-    }
-    try {
-      const outcome = await submitGameResult({ playerId, gameKey: "elimination", answers, score });
-      refresh();
-      setExisting(outcome.result);
-      setModal({ open: true, score: outcome.result.score, total: outcome.player.totalScore, rank: outcome.rank });
-    } catch (error) {
-      setMessage(error instanceof Error ? error.message : "提交失败");
-    }
   }
 
   return (
@@ -114,7 +128,7 @@ export default function EliminationPage() {
       
       {!existingLoading && existing && <section className="statusBanner">该游戏已完成，本关得分 {existing.score}，不能重复提交。</section>}
       
-      {currentQuestion && (
+      {currentQuestion && !eliminationModal.open && (
         <section className="questionStack">
           <article className="questionCard" style={{ padding: '24px 20px' }}>
             <h3 style={{ fontSize: '22px', fontWeight: 'bold', margin: '0 0 20px 0', lineHeight: '1.4' }}>
@@ -140,18 +154,8 @@ export default function EliminationPage() {
       
       <section className="statusPanel">
         <b>已完成 {Object.keys(answers).length}/5</b>
-        <span>{message || "每次只生成一道淘汰题，手动进入下一题。"}</span>
+        <span>{message || "答对可进入下一题，答错即被淘汰。"}</span>
       </section>
-      
-      {isLastQuestion ? (
-        <button className="primaryButton" disabled={Boolean(existing) || isOpen !== true || !selectedAnswer} type="button" onClick={submit}>
-          提交站立淘汰
-        </button>
-      ) : (
-        <button className="primaryButton" disabled={Boolean(existing) || isOpen !== true || !selectedAnswer} type="button" onClick={goNext}>
-          下一题
-        </button>
-      )}
       
       <ResultModal
         open={modal.open}
@@ -159,6 +163,7 @@ export default function EliminationPage() {
         roundScore={modal.score}
         totalScore={modal.total}
         rank={modal.rank}
+        isEliminated={modal.isEliminated}
         onBackLobby={() => {
           router.replace("/result");
           window.setTimeout(() => {
@@ -168,6 +173,13 @@ export default function EliminationPage() {
           }, 300);
         }}
         buttonText="查看最终成绩"
+      />
+      
+      <EliminationModal
+        open={eliminationModal.open}
+        type={eliminationModal.type}
+        onNext={goNext}
+        onBack={() => router.push("/lobby")}
       />
     </Layout>
   );

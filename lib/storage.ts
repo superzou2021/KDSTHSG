@@ -208,7 +208,13 @@ export async function toggleGameOpen(gameKey: GameKey): Promise<AppState> {
   state.games = state.games.map((game) => {
     if (game.key !== gameKey) return game;
     const isOpen = !game.isOpen;
-    return game.key === "bingo" ? { ...game, isOpen, bingoScored: isOpen ? false : game.bingoScored } : { ...game, isOpen };
+    if (game.key === "bingo") {
+      return { ...game, isOpen, bingoScored: isOpen ? false : game.bingoScored };
+    }
+    if (game.key === "quiz" && isOpen) {
+      return { ...game, isOpen, quizCurrentGroup: 0 };
+    }
+    return { ...game, isOpen };
   });
   saveStateLocal(state);
   return state;
@@ -221,6 +227,21 @@ export async function triggerBingoScore(): Promise<AppState> {
   }
   const state = settlePendingBingoResults(loadStateLocal());
   state.games = state.games.map((game) => (game.key === "bingo" ? { ...game, isOpen: false, bingoScored: true } : game));
+  saveStateLocal(state);
+  return state;
+}
+
+export async function advanceQuizGroup(): Promise<AppState> {
+  const available = await checkBackend();
+  if (available) {
+    return await pbStorage.advanceQuizGroup();
+  }
+  const state = loadStateLocal();
+  state.games = state.games.map((game) => {
+    if (game.key !== "quiz") return game;
+    const nextGroup = (game.quizCurrentGroup || 0) + 1;
+    return { ...game, quizCurrentGroup: nextGroup };
+  });
   saveStateLocal(state);
   return state;
 }

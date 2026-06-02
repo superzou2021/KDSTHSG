@@ -7,7 +7,6 @@ import Layout from "@/components/Layout";
 import OfficeAverageTable from "@/components/OfficeAverageTable";
 import OfficeTop3Panel from "@/components/OfficeTop3Panel";
 import RankingTable from "@/components/RankingTable";
-import ScorePanel from "@/components/ScorePanel";
 import { GAME_ORDER } from "@/lib/constants";
 import { useCurrentPlayer, useLobbySnapshot, useRanking } from "@/hooks/use-game-data";
 
@@ -47,16 +46,16 @@ export default function ResultPage() {
 
   return (
     <Layout title="最终成绩" eyebrow="RESULT" rightSlot={<Link href="/ranking">排行</Link>}>
-      <section className="profileCard resultHero">
-        <div>
-          <span className="eyebrow">TOTAL SCORE</span>
-          <h2>{currentPlayer.totalScore}</h2>
-          <p>{currentPlayer.name} / {currentPlayer.office} / {currentPlayer.team}</p>
+      <section className="profileCard resultHero" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', gap: '24px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
+          <div>
+            <span className="eyebrow">TOTAL SCORE</span>
+            <h2 style={{ fontSize: '48px', margin: '8px 0' }}>{currentPlayer.totalScore}</h2>
+          </div>
+          <strong style={{ fontSize: '32px' }}>#{currentRank || "-"}</strong>
         </div>
-        <strong>#{currentRank || "-"}</strong>
+        <p style={{ fontSize: '24px', fontWeight: 'bold', margin: 0 }}>{currentPlayer.name} / {currentPlayer.office} / {currentPlayer.team}</p>
       </section>
-
-      <ScorePanel roundScore={roundScore} totalScore={currentPlayer.totalScore} rank={currentRank || 0} />
 
       {missingGames.length > 0 && (
         <section className="statusBanner">
