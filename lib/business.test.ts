@@ -269,6 +269,126 @@ test("综合场景: 完整排名流程验证", () => {
   assert.equal(rankA, contextA.rank);
 });
 
+// ========== 新增：复杂排名场景测试 ==========
+test("排名: 大量玩家场景", () => {
+  const manyPlayers: Player[] = [];
+  for (let i = 0; i < 100; i++) {
+    manyPlayers.push({
+      id: `player-${i}`,
+      name: `Player ${i}`,
+      phone: `139000000${String(i).padStart(2, "0")}`,
+      office: ["北京", "上海", "深圳", "香港"][i % 4],
+      team: ["Alpha", "Beta", "Gamma", "Delta"][i % 4],
+      totalScore: 400 - i * 5, // 分数递减，每个玩家比前一个低5分
+      completedGames: [],
+      finalSubmitted: false,
+      created: `2026-01-01T09:${String(i).padStart(2, "0")}:00.000Z`,
+      updated: `2026-01-01T09:${String(i).padStart(2, "0")}:00.000Z`,
+      finalCompletedAt: `2026-01-01T09:${String(i).padStart(2, "0")}:00.000Z`
+    });
+  }
+  
+  const ranking = buildRanking(manyPlayers);
+  const top10 = getTop10Ranking(manyPlayers);
+  
+  assert.equal(ranking.length, 100);
+  assert.equal(top10.length, 10);
+  assert.equal(top10[0].totalScore, 400); // 第1名
+  assert.equal(top10[9].totalScore, 355); // 第10名: 400 - 9*5 = 355
+});
+
+test("排名: 所有玩家分数相同", () => {
+  const sameScorePlayers: Player[] = [
+    { id: "p1", name: "P1", phone: "13900000001", office: "北京", team: "Alpha", totalScore: 300, completedGames: [], finalSubmitted: false, created: "2026-01-01T09:00:00.000Z", updated: "2026-01-01T09:05:00.000Z", finalCompletedAt: "2026-01-01T09:05:00.000Z" },
+    { id: "p2", name: "P2", phone: "13900000002", office: "北京", team: "Beta", totalScore: 300, completedGames: [], finalSubmitted: false, created: "2026-01-01T09:00:00.000Z", updated: "2026-01-01T09:03:00.000Z", finalCompletedAt: "2026-01-01T09:03:00.000Z" },
+    { id: "p3", name: "P3", phone: "13900000003", office: "上海", team: "Gamma", totalScore: 300, completedGames: [], finalSubmitted: false, created: "2026-01-01T09:00:00.000Z", updated: "2026-01-01T09:04:00.000Z", finalCompletedAt: "2026-01-01T09:04:00.000Z" }
+  ];
+  
+  const ranking = buildRanking(sameScorePlayers);
+  
+  // 分数相同时按完成时间排序
+  assert.equal(ranking[0].playerId, "p2"); // 完成最早
+  assert.equal(ranking[1].playerId, "p3");
+  assert.equal(ranking[2].playerId, "p1");
+});
+
+test("排名: 所有玩家分数都为0", () => {
+  const zeroScorePlayers: Player[] = [
+    { id: "p1", name: "P1", phone: "13900000001", office: "北京", team: "Alpha", totalScore: 0, completedGames: [], finalSubmitted: false, created: "2026-01-01T09:00:00.000Z", updated: "2026-01-01T09:00:00.000Z", finalCompletedAt: undefined },
+    { id: "p2", name: "P2", phone: "13900000002", office: "上海", team: "Beta", totalScore: 0, completedGames: [], finalSubmitted: false, created: "2026-01-01T09:00:00.000Z", updated: "2026-01-01T09:00:00.000Z", finalCompletedAt: undefined }
+  ];
+  
+  const ranking = buildRanking(zeroScorePlayers);
+  
+  assert.equal(ranking.length, 2);
+  assert.equal(ranking[0].totalScore, 0);
+  assert.equal(ranking[1].totalScore, 0);
+});
+
+test("Office排名: 单个Office场景", () => {
+  const singleOfficePlayers: Player[] = [
+    { id: "p1", name: "P1", phone: "13900000001", office: "北京", team: "Alpha", totalScore: 300, completedGames: [], finalSubmitted: false, created: "2026-01-01T09:00:00.000Z", updated: "2026-01-01T09:00:00.000Z", finalCompletedAt: "2026-01-01T09:00:00.000Z" },
+    { id: "p2", name: "P2", phone: "13900000002", office: "北京", team: "Beta", totalScore: 250, completedGames: [], finalSubmitted: false, created: "2026-01-01T09:00:00.000Z", updated: "2026-01-01T09:00:00.000Z", finalCompletedAt: "2026-01-01T09:00:00.000Z" }
+  ];
+  
+  const officeAverages = getOfficeAverageRanking(singleOfficePlayers);
+  const officeTop3 = getOfficeTop3(singleOfficePlayers);
+  
+  assert.equal(officeAverages.length, 1);
+  assert.equal(officeAverages[0].office, "北京");
+  assert.equal(officeAverages[0].averageScore, 275); // (300+250)/2
+  
+  assert.equal(officeTop3.length, 1);
+  assert.equal(officeTop3[0].players.length, 2);
+});
+
+// ========== 新增：排名上下文边界测试 ==========
+test("排名上下文: 排名刚好第10位", () => {
+  const tenPlayers: Player[] = [];
+  for (let i = 0; i < 10; i++) {
+    tenPlayers.push({
+      id: `player-${i}`,
+      name: `Player ${i}`,
+      phone: `139000000${String(i).padStart(2, "0")}`,
+      office: "北京",
+      team: "Team",
+      totalScore: 400 - i * 10,
+      completedGames: [],
+      finalSubmitted: false,
+      created: "2026-01-01T09:00:00.000Z",
+      updated: "2026-01-01T09:00:00.000Z",
+      finalCompletedAt: "2026-01-01T09:00:00.000Z"
+    });
+  }
+  
+  const context = getPlayerRankingContext(tenPlayers, "player-9");
+  assert.equal(context.rank, 10);
+  assert.equal(context.distanceToTop10, null); // 在TOP10内
+});
+
+test("排名上下文: 排名第11位", () => {
+  const elevenPlayers: Player[] = [];
+  for (let i = 0; i < 11; i++) {
+    elevenPlayers.push({
+      id: `player-${i}`,
+      name: `Player ${i}`,
+      phone: `139000000${String(i).padStart(2, "0")}`,
+      office: "北京",
+      team: "Team",
+      totalScore: 400 - i * 10,
+      completedGames: [],
+      finalSubmitted: false,
+      created: "2026-01-01T09:00:00.000Z",
+      updated: "2026-01-01T09:00:00.000Z",
+      finalCompletedAt: "2026-01-01T09:00:00.000Z"
+    });
+  }
+  
+  const context = getPlayerRankingContext(elevenPlayers, "player-10");
+  assert.equal(context.rank, 11);
+  assert.equal(context.distanceToTop10, 11); // 310 - 300 + 1 = 11
+});
+
 // ========== 手机号验证测试 ==========
 test("validatePhone: 有效的手机号验证", () => {
   assert.equal(validatePhone("13800138000"), true);

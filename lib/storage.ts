@@ -1,7 +1,8 @@
 "use client";
 
 import * as pbStorage from "@/lib/pb-storage";
-import { GAME_ORDER, GAMES, PLAYER_ID_KEY, PLAYER_PHONE_KEY, QUESTIONS, SEED_PLAYERS, STATE_KEY } from "@/lib/constants";
+import { GAME_ORDER, GAMES, PLAYER_CACHE_KEY, PLAYER_ID_KEY, PLAYER_PHONE_KEY, QUESTIONS, SEED_PLAYERS, STATE_KEY } from "@/lib/constants";
+import { settlePendingBingoResults } from "@/lib/game-state";
 import { getOfficeAverageRanking, getOfficeTop3, getPlayerRank, getPlayerRankingContext, getTop10Ranking } from "@/lib/ranking";
 import type { AppState, GameKey, GameResult, Player } from "@/types";
 
@@ -17,6 +18,28 @@ function createId(prefix: string): string {
 
 function isBrowser(): boolean {
   return typeof window !== "undefined";
+}
+
+function setCachedPlayer(player: Player): void {
+  if (!isBrowser()) return;
+  window.localStorage.setItem(PLAYER_CACHE_KEY, JSON.stringify(player));
+}
+
+function getCachedPlayer(playerId?: string | null): Player | null {
+  if (!isBrowser()) return null;
+  try {
+    const raw = window.localStorage.getItem(PLAYER_CACHE_KEY);
+    if (!raw) return null;
+    const player = JSON.parse(raw) as Player;
+    if (playerId && player.id !== playerId) return null;
+    return player;
+  } catch {
+    return null;
+  }
+}
+
+function hasPocketBaseConfig(): boolean {
+  return Boolean(process.env.NEXT_PUBLIC_POCKETBASE_URL);
 }
 
 export async function checkBackend(): Promise<boolean> {
@@ -89,7 +112,12 @@ export async function getCurrentPlayer(): Promise<Player | null> {
   const playerId = await getCurrentPlayerId();
   if (!playerId) return null;
   const state = await loadState();
-  return state.players.find((player) => player.id === playerId) || null;
+  const player = state.players.find((item) => item.id === playerId) || null;
+  if (player) {
+    setCachedPlayer(player);
+    return player;
+  }
+  return getCachedPlayer(playerId);
 }
 
 export function validatePhone(phone: string): boolean {
@@ -107,6 +135,7 @@ export function validatePhone(phone: string): boolean {
 export async function registerPlayer(input: { name: string; phone: string; office: string; team: string }): Promise<{ player: Player; reused: boolean }> {
   const available = await checkBackend();
   if (available) {
+    await pbStorage.ensureCollections();
     return await pbStorage.registerPlayer(input);
   }
 
@@ -125,6 +154,7 @@ export async function registerPlayer(input: { name: string; phone: string; offic
   if (existing) {
     window.localStorage.setItem(PLAYER_ID_KEY, existing.id);
     window.localStorage.setItem(PLAYER_PHONE_KEY, phone);
+    setCachedPlayer(existing);
     return { player: existing, reused: true };
   }
 
@@ -144,6 +174,7 @@ export async function registerPlayer(input: { name: string; phone: string; offic
   saveStateLocal(state);
   window.localStorage.setItem(PLAYER_ID_KEY, player.id);
   window.localStorage.setItem(PLAYER_PHONE_KEY, phone);
+  setCachedPlayer(player);
   return { player, reused: false };
 }
 
@@ -151,6 +182,9 @@ export async function getGameResult(playerId: string, gameKey: GameKey): Promise
   const available = await checkBackend();
   if (available) {
     return await pbStorage.getGameResult(playerId, gameKey);
+  }
+  if (hasPocketBaseConfig()) {
+    return null;
   }
   const state = loadStateLocal();
   return state.gameResults.find((result) => result.player === playerId && result.gameKey === gameKey) || null;
@@ -171,7 +205,22 @@ export async function toggleGameOpen(gameKey: GameKey): Promise<AppState> {
     return await pbStorage.toggleGameOpen(gameKey);
   }
   const state = loadStateLocal();
-  state.games = state.games.map((game) => (game.key === gameKey ? { ...game, isOpen: !game.isOpen } : game));
+  state.games = state.games.map((game) => {
+    if (game.key !== gameKey) return game;
+    const isOpen = !game.isOpen;
+    return game.key === "bingo" ? { ...game, isOpen, bingoScored: isOpen ? false : game.bingoScored } : { ...game, isOpen };
+  });
+  saveStateLocal(state);
+  return state;
+}
+
+export async function triggerBingoScore(): Promise<AppState> {
+  const available = await checkBackend();
+  if (available) {
+    return await pbStorage.triggerBingoScore();
+  }
+  const state = settlePendingBingoResults(loadStateLocal());
+  state.games = state.games.map((game) => (game.key === "bingo" ? { ...game, isOpen: false, bingoScored: true } : game));
   saveStateLocal(state);
   return state;
 }
@@ -181,6 +230,7 @@ export async function submitGameResult(input: {
   gameKey: GameKey;
   answers: Record<string, unknown>;
   score: number;
+  pendingBingoScore?: boolean;
 }): Promise<{ result: GameResult; player: Player; rank: number }> {
   const available = await checkBackend();
   if (available) {
@@ -205,8 +255,15 @@ export async function submitGameResult(input: {
     answers: input.answers,
     score: Math.max(0, Math.min(100, Math.round(input.score))),
     maxScore: 100,
-    completedAt: nowIso()
+    completedAt: nowIso(),
+    pendingBingoScore: input.pendingBingoScore
   };
+
+  if (input.pendingBingoScore) {
+    state.gameResults = [...state.gameResults, result];
+    saveStateLocal(state);
+    return { result, player: state.players[playerIndex], rank: getPlayerRank(state.players, input.playerId) };
+  }
 
   const gameResults = [...state.gameResults, result];
   const totalScore = gameResults
@@ -236,7 +293,7 @@ export async function getQuestions(gameKey: GameKey) {
 
 export async function getLobbySnapshot(playerId: string) {
   const state = await loadState();
-  const player = state.players.find((item) => item.id === playerId) || null;
+  const player = state.players.find((item) => item.id === playerId) || getCachedPlayer(playerId);
   return {
     state,
     player,
@@ -269,6 +326,7 @@ export async function resetDemoData(): Promise<void> {
   window.localStorage.removeItem(STATE_KEY);
   window.localStorage.removeItem(PLAYER_ID_KEY);
   window.localStorage.removeItem(PLAYER_PHONE_KEY);
+  window.localStorage.removeItem(PLAYER_CACHE_KEY);
   loadStateLocal();
 }
 

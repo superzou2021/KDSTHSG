@@ -1,9 +1,10 @@
 "use client";
 
 import { pb } from "@/lib/pocketbase";
-import { GAME_ORDER, GAMES, PLAYER_ID_KEY, PLAYER_PHONE_KEY, QUESTIONS, SEED_PLAYERS } from "@/lib/constants";
+import { GAME_ORDER, GAMES, PLAYER_CACHE_KEY, PLAYER_ID_KEY, PLAYER_PHONE_KEY, QUESTIONS, SEED_PLAYERS } from "@/lib/constants";
+import { settlePendingBingoResults } from "@/lib/game-state";
 import { getOfficeAverageRanking, getOfficeTop3, getPlayerRank, getPlayerRankingContext, getTop10Ranking } from "@/lib/ranking";
-import type { AppState, GameKey, GameResult, Player } from "@/types";
+import type { AppState, Game, GameKey, GameResult, Player } from "@/types";
 
 let pocketBaseAvailable = false;
 
@@ -17,6 +18,71 @@ function createId(prefix: string): string {
 
 function isBrowser(): boolean {
   return typeof window !== "undefined";
+}
+
+function setCachedPlayer(player: Player): void {
+  if (!isBrowser()) return;
+  window.localStorage.setItem(PLAYER_CACHE_KEY, JSON.stringify(player));
+}
+
+function getCachedPlayer(playerId?: string | null): Player | null {
+  if (!isBrowser()) return null;
+  try {
+    const raw = window.localStorage.getItem(PLAYER_CACHE_KEY);
+    if (!raw) return null;
+    const player = JSON.parse(raw) as Player;
+    if (playerId && player.id !== playerId) return null;
+    return player;
+  } catch {
+    return null;
+  }
+}
+
+function mapPlayerRecord(record: any): Player {
+  return {
+    id: record.id,
+    name: record.name,
+    phone: record.phone,
+    office: record.office,
+    team: record.team,
+    totalScore: record.totalScore || 0,
+    completedGames: record.completedGames || [],
+    finalSubmitted: Boolean(record.finalSubmitted),
+    created: record.created || nowIso(),
+    updated: record.updated || record.created || nowIso(),
+    finalCompletedAt: record.finalCompletedAt || undefined
+  };
+}
+
+function mapGameRecord(record: any): Game {
+  return {
+    id: record.id,
+    key: record.key,
+    name: record.name,
+    maxScore: record.maxScore,
+    isOpen: Boolean(record.isOpen),
+    order: record.order,
+    bingoScored: Boolean(record.bingoScored)
+  };
+}
+
+function mapPendingBingoScore(record: any): boolean {
+  if (typeof record.pendingBingoScore === "boolean") {
+    return record.pendingBingoScore;
+  }
+  return Boolean(record.answers?.pendingBingoScore);
+}
+
+function buildPlayerUpdate(player: Player): Record<string, unknown> {
+  const playerUpdate: Record<string, unknown> = {
+    totalScore: player.totalScore,
+    completedGames: player.completedGames,
+    finalSubmitted: player.finalSubmitted
+  };
+  if (player.finalCompletedAt) {
+    playerUpdate.finalCompletedAt = player.finalCompletedAt;
+  }
+  return playerUpdate;
 }
 
 export async function checkPocketBase(): Promise<boolean> {
@@ -50,6 +116,39 @@ export async function ensureGameState(): Promise<void> {
   }
 }
 
+export async function ensureCollections(): Promise<void> {
+  const available = await checkPocketBase();
+  if (!available) return;
+
+  try {
+    await pb.collection("players").getFullList(1);
+  } catch {
+    try {
+      await pb.collection("players").create({
+        name: "temp",
+        phone: "13900000000",
+        office: "北京",
+        team: "Alpha",
+        totalScore: 0,
+        completedGames: [],
+        finalSubmitted: false
+      });
+      const records = await pb.collection("players").getFullList();
+      for (const record of records) {
+        await pb.collection("players").delete(record.id);
+      }
+    } catch {}
+  }
+
+  try {
+    await pb.collection("game_results").getFullList(1);
+  } catch {
+    console.warn("game_results collection not found, using localStorage fallback");
+  }
+
+  await ensureGameState();
+}
+
 export async function loadStateFromPB(): Promise<AppState> {
   const available = await checkPocketBase();
   if (!available) {
@@ -58,24 +157,12 @@ export async function loadStateFromPB(): Promise<AppState> {
 
   try {
     const [players, gameResults, games] = await Promise.all([
-      pb.collection("players").getFullList({ sort: "created" }),
-      pb.collection("game_results").getFullList({ sort: "created" }),
+      pb.collection("players").getFullList(),
+      pb.collection("game_results").getFullList({ sort: "completedAt" }),
       pb.collection("games").getFullList({ sort: "order" })
     ]);
 
-    const mappedPlayers: Player[] = players.map(p => ({
-      id: p.id,
-      name: p.name,
-      phone: p.phone,
-      office: p.office,
-      team: p.team,
-      totalScore: p.totalScore,
-      completedGames: p.completedGames || [],
-      finalSubmitted: p.finalSubmitted,
-      created: p.created,
-      updated: p.updated,
-      finalCompletedAt: p.finalCompletedAt
-    }));
+    const mappedPlayers: Player[] = players.map(mapPlayerRecord);
 
     const mappedResults: GameResult[] = gameResults.map(r => ({
       id: r.id,
@@ -84,13 +171,15 @@ export async function loadStateFromPB(): Promise<AppState> {
       answers: r.answers,
       score: r.score,
       maxScore: r.maxScore,
-      completedAt: r.completedAt
+      completedAt: r.completedAt,
+      pendingBingoScore: mapPendingBingoScore(r)
     }));
+    const mappedGames: Game[] = games.map(mapGameRecord);
 
     return {
-      players: mappedPlayers.length > 0 ? mappedPlayers : SEED_PLAYERS,
+      players: mappedPlayers,
       gameResults: mappedResults,
-      games: games.length > 0 ? games : GAMES,
+      games: mappedGames.length > 0 ? mappedGames : GAMES,
       questions: QUESTIONS
     };
   } catch {
@@ -138,7 +227,12 @@ export async function getCurrentPlayer(): Promise<Player | null> {
   const playerId = await getCurrentPlayerId();
   if (!playerId) return null;
   const state = await loadState();
-  return state.players.find((player) => player.id === playerId) || null;
+  const player = state.players.find((item) => item.id === playerId) || null;
+  if (player) {
+    setCachedPlayer(player);
+    return player;
+  }
+  return getCachedPlayer(playerId);
 }
 
 export function validatePhone(phone: string): boolean {
@@ -164,12 +258,46 @@ export async function registerPlayer(input: { name: string; phone: string; offic
   if (!office) throw new Error("请选择 Office");
   if (!team) throw new Error("请选择或填写 Team");
 
+  const available = await checkPocketBase();
+  if (available) {
+    await ensureCollections();
+    const existing = await pb.collection("players").getFirstListItem(pb.filter("phone = {:phone}", { phone })).catch(() => null);
+    if (existing) {
+      const player = mapPlayerRecord(existing);
+      if (isBrowser()) {
+        window.localStorage.setItem(PLAYER_ID_KEY, player.id);
+        window.localStorage.setItem(PLAYER_PHONE_KEY, phone);
+        setCachedPlayer(player);
+      }
+      return { player, reused: true };
+    }
+
+    const created = await pb.collection("players").create({
+      name,
+      phone,
+      office,
+      team,
+      totalScore: 0,
+      completedGames: [],
+      finalSubmitted: false
+    });
+    const player = mapPlayerRecord(created);
+    if (isBrowser()) {
+      window.localStorage.setItem(PLAYER_ID_KEY, player.id);
+      window.localStorage.setItem(PLAYER_PHONE_KEY, phone);
+      setCachedPlayer(player);
+      window.dispatchEvent(new Event("annual-game-state-change"));
+    }
+    return { player, reused: false };
+  }
+
   const state = await loadState();
   const existing = state.players.find((player) => player.phone === phone);
 
   if (existing) {
     window.localStorage.setItem(PLAYER_ID_KEY, existing.id);
     window.localStorage.setItem(PLAYER_PHONE_KEY, phone);
+    setCachedPlayer(existing);
     return { player: existing, reused: true };
   }
 
@@ -186,27 +314,11 @@ export async function registerPlayer(input: { name: string; phone: string; offic
     updated: nowIso()
   };
 
-  const available = await checkPocketBase();
-  if (available) {
-    try {
-      const created = await pb.collection("players").create({
-        name: player.name,
-        phone: player.phone,
-        office: player.office,
-        team: player.team,
-        totalScore: player.totalScore,
-        completedGames: player.completedGames,
-        finalSubmitted: player.finalSubmitted
-      });
-      player.id = created.id;
-    } catch {}
-  }
-
   if (isBrowser()) {
     window.localStorage.setItem(PLAYER_ID_KEY, player.id);
     window.localStorage.setItem(PLAYER_PHONE_KEY, phone);
+    setCachedPlayer(player);
   }
-
   await saveState({ ...state, players: [...state.players, player] });
   return { player, reused: false };
 }
@@ -223,24 +335,59 @@ export async function isGameOpen(gameKey: GameKey): Promise<boolean> {
 
 export async function toggleGameOpen(gameKey: GameKey): Promise<AppState> {
   const state = await loadState();
-  const newGames = state.games.map((game) => (game.key === gameKey ? { ...game, isOpen: !game.isOpen } : game));
+  const newGames = state.games.map((game) => {
+    if (game.key !== gameKey) return game;
+    const isOpen = !game.isOpen;
+    return game.key === "bingo" ? { ...game, isOpen, bingoScored: isOpen ? false : game.bingoScored } : { ...game, isOpen };
+  });
   const newState = { ...state, games: newGames };
 
   const available = await checkPocketBase();
   if (available) {
-    try {
-      const list = await pb.collection("games").getFullList();
-      for (const game of newGames) {
-        const existing = list.find(g => g.key === game.key);
-        if (existing) {
-          await pb.collection("games").update(existing.id, { isOpen: game.isOpen });
-        }
+    const list = await pb.collection("games").getFullList();
+    for (const game of newGames) {
+      const existing = list.find(g => g.key === game.key);
+      if (existing) {
+        const data = game.key === "bingo" ? { isOpen: game.isOpen, bingoScored: Boolean(game.bingoScored) } : { isOpen: game.isOpen };
+        await pb.collection("games").update(existing.id, data);
       }
-    } catch {}
+    }
   }
 
   await saveState(newState);
-  return newState;
+  return available ? await loadState() : newState;
+}
+
+export async function triggerBingoScore(): Promise<AppState> {
+  const state = settlePendingBingoResults(await loadState());
+  const newGames = state.games.map((game) => (game.key === "bingo" ? { ...game, isOpen: false, bingoScored: true } : game));
+  const newState = { ...state, games: newGames };
+
+  const available = await checkPocketBase();
+  if (available) {
+    const pendingResults = await pb.collection("game_results").getFullList({ filter: "gameKey = 'bingo'" });
+    for (const result of pendingResults) {
+      if (mapPendingBingoScore(result)) {
+        await pb.collection("game_results").update(result.id, {
+          pendingBingoScore: false,
+          answers: { ...result.answers, pendingBingoScore: false }
+        });
+      }
+    }
+
+    for (const player of newState.players) {
+      await pb.collection("players").update(player.id, buildPlayerUpdate(player));
+    }
+
+    const list = await pb.collection("games").getFullList();
+    const bingo = list.find(g => g.key === "bingo");
+    if (bingo) {
+      await pb.collection("games").update(bingo.id, { isOpen: false, bingoScored: true });
+    }
+  }
+
+  await saveState(newState);
+  return available ? await loadState() : newState;
 }
 
 export async function submitGameResult(input: {
@@ -248,6 +395,7 @@ export async function submitGameResult(input: {
   gameKey: GameKey;
   answers: Record<string, unknown>;
   score: number;
+  pendingBingoScore?: boolean;
 }): Promise<{ result: GameResult; player: Player; rank: number }> {
   const state = await loadState();
   const game = state.games.find((g) => g.key === input.gameKey);
@@ -270,22 +418,31 @@ export async function submitGameResult(input: {
     answers: input.answers,
     score: Math.max(0, Math.min(100, Math.round(input.score))),
     maxScore: 100,
-    completedAt: nowIso()
+    completedAt: nowIso(),
+    pendingBingoScore: input.pendingBingoScore
   };
 
   const available = await checkPocketBase();
   if (available) {
-    try {
-      const created = await pb.collection("game_results").create({
-        player: result.player,
-        gameKey: result.gameKey,
-        answers: result.answers,
-        score: result.score,
-        maxScore: result.maxScore,
-        completedAt: result.completedAt
-      });
-      result.id = created.id;
-    } catch {}
+    const created = await pb.collection("game_results").create({
+      player: result.player,
+      gameKey: result.gameKey,
+      answers: result.answers,
+      score: result.score,
+      maxScore: result.maxScore,
+      completedAt: result.completedAt,
+      pendingBingoScore: Boolean(input.pendingBingoScore)
+    });
+    result.id = created.id;
+  }
+
+  if (input.pendingBingoScore) {
+    const newState: AppState = {
+      ...state,
+      gameResults: [...state.gameResults, result]
+    };
+    await saveState(newState);
+    return { result, player: state.players[playerIndex], rank: getPlayerRank(state.players, input.playerId) };
   }
 
   const gameResults = [...state.gameResults, result];
@@ -304,15 +461,7 @@ export async function submitGameResult(input: {
   };
 
   if (available) {
-    try {
-      await pb.collection("players").update(player.id, {
-        totalScore: player.totalScore,
-        completedGames: player.completedGames,
-        finalSubmitted: player.finalSubmitted,
-        finalCompletedAt: player.finalCompletedAt,
-        updated: player.updated
-      });
-    } catch {}
+    await pb.collection("players").update(player.id, buildPlayerUpdate(player));
   }
 
   const newState: AppState = {
@@ -332,7 +481,7 @@ export async function getQuestions(gameKey: GameKey) {
 
 export async function getLobbySnapshot(playerId: string) {
   const state = await loadState();
-  const player = state.players.find((item) => item.id === playerId) || null;
+  const player = state.players.find((item) => item.id === playerId) || getCachedPlayer(playerId);
   return {
     state,
     player,
@@ -362,6 +511,7 @@ export async function resetDemoData(): Promise<void> {
     try {
       const players = await pb.collection("players").getFullList();
       const results = await pb.collection("game_results").getFullList();
+      const games = await pb.collection("games").getFullList();
 
       for (const p of players) {
         await pb.collection("players").delete(p.id);
@@ -369,28 +519,46 @@ export async function resetDemoData(): Promise<void> {
       for (const r of results) {
         await pb.collection("game_results").delete(r.id);
       }
+      for (const game of games) {
+        await pb.collection("games").update(game.id, {
+          isOpen: false,
+          bingoScored: game.key === "bingo" ? false : Boolean(game.bingoScored)
+        });
+      }
     } catch {}
   }
 
   window.localStorage.removeItem("annual_game_demo_state_v3");
   window.localStorage.removeItem(PLAYER_ID_KEY);
   window.localStorage.removeItem(PLAYER_PHONE_KEY);
+  window.localStorage.removeItem(PLAYER_CACHE_KEY);
   await loadState();
 }
 
 export function subscribeToState(callback: () => void): () => void {
   let unsub: (() => void) | null = null;
+  let disposed = false;
+
+  const setUnsub = (nextUnsub: () => void) => {
+    if (disposed) {
+      nextUnsub();
+      return;
+    }
+    unsub = nextUnsub;
+  };
 
   checkPocketBase().then(available => {
+    if (disposed) return;
+
     if (!available) {
       if (isBrowser()) {
         const handler = () => callback();
         window.addEventListener("annual-game-state-change", handler);
         window.addEventListener("storage", handler);
-        unsub = () => {
+        setUnsub(() => {
           window.removeEventListener("annual-game-state-change", handler);
           window.removeEventListener("storage", handler);
-        };
+        });
       }
       return;
     }
@@ -400,9 +568,12 @@ export function subscribeToState(callback: () => void): () => void {
       pb.collection("game_results").subscribe("*", callback),
       pb.collection("games").subscribe("*", callback)
     ]).then(unsubs => {
-      unsub = () => unsubs.forEach(u => u());
+      setUnsub(() => unsubs.forEach(u => u()));
     }).catch(() => {});
   });
 
-  return () => unsub?.();
+  return () => {
+    disposed = true;
+    unsub?.();
+  };
 }

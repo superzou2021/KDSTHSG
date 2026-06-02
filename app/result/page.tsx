@@ -13,59 +13,81 @@ import { useCurrentPlayer, useLobbySnapshot, useRanking } from "@/hooks/use-game
 
 export default function ResultPage() {
   const router = useRouter();
-  const { player, playerId } = useCurrentPlayer();
-  const { ranking } = useRanking(playerId);
-  const { snapshot } = useLobbySnapshot(playerId);
+  const { player, playerId, loading: playerLoading } = useCurrentPlayer();
+  const { snapshot, loading: snapshotLoading } = useLobbySnapshot(playerId);
+  const { ranking, loading: rankingLoading } = useRanking(playerId, 1500);
 
   useEffect(() => {
-    if (playerId === null) router.push("/register");
+    if (playerId === null) router.replace("/register");
   }, [playerId, router]);
 
-  if (!player) return <Layout title="最终成绩">正在读取成绩...</Layout>;
-
-  const context = ranking.context;
-  const missingGames = GAME_ORDER.filter((key) => !player.completedGames.includes(key));
-  
-  // 获取最后完成的游戏的分数
-  const lastResult = snapshot?.results
+  const rankedPlayer = playerId ? ranking.players.find((item) => item.id === playerId) : null;
+  const currentPlayer = snapshot?.player || player || rankedPlayer || null;
+  const currentRank = ranking.context?.rank || (currentPlayer ? ranking.players.findIndex((item) => item.id === currentPlayer.id) + 1 : 0);
+  const playerResults = snapshot?.results || (playerId ? ranking.results.filter((result) => result.player === playerId) : []);
+  const lastResult = playerResults
     .slice()
     .sort((a, b) => new Date(b.completedAt).getTime() - new Date(a.completedAt).getTime())[0];
   const roundScore = lastResult?.score || 0;
+  const missingGames = currentPlayer ? GAME_ORDER.filter((key) => !currentPlayer.completedGames.includes(key)) : [];
+  const isLoading = playerId === undefined || (playerLoading && snapshotLoading && rankingLoading);
+
+  if (!currentPlayer) {
+    return (
+      <Layout title="最终成绩" eyebrow="RESULT">
+        <section className="statusBanner">{isLoading ? "正在读取成绩..." : "未找到当前用户，请重新注册。"}</section>
+        {!isLoading && (
+          <div className="pageActions">
+            <Link className="primaryButton" href="/register">返回注册</Link>
+          </div>
+        )}
+      </Layout>
+    );
+  }
 
   return (
     <Layout title="最终成绩" eyebrow="RESULT" rightSlot={<Link href="/ranking">排行</Link>}>
       <section className="profileCard resultHero">
         <div>
           <span className="eyebrow">TOTAL SCORE</span>
-          <h2>{player.totalScore}</h2>
-          <p>{player.name} / {player.office} / {player.team}</p>
+          <h2>{currentPlayer.totalScore}</h2>
+          <p>{currentPlayer.name} / {currentPlayer.office} / {currentPlayer.team}</p>
         </div>
-        <strong>#{context?.rank || "-"}</strong>
+        <strong>#{currentRank || "-"}</strong>
       </section>
-      <ScorePanel roundScore={roundScore} totalScore={player.totalScore} rank={context?.rank || 0} />
+
+      <ScorePanel roundScore={roundScore} totalScore={currentPlayer.totalScore} rank={currentRank || 0} />
+
       {missingGames.length > 0 && (
         <section className="statusBanner">
-          还有 {missingGames.length} 个游戏未完成，建议回大厅继续完成后再展示最终成绩。
+          还有 {missingGames.length} 个游戏未完成，当前展示的是已完成环节成绩。
         </section>
       )}
-      {context?.distanceToTop10 !== null && context?.distanceToTop10 !== undefined && (
+
+      {ranking.context?.distanceToTop10 !== null && ranking.context?.distanceToTop10 !== undefined && (
         <section className="statusPanel">
-          <b>距离 TOP10 还差 {context.distanceToTop10} 分</b>
-          <span>当前上一名：{context.previousPlayer?.name || "-"}，差距 {context.distanceToPrevious || 0} 分。</span>
+          <b>距离 TOP10 还差 {ranking.context.distanceToTop10} 分</b>
+          <span>
+            当前上一名：{ranking.context.previousPlayer?.name || "-"}，差距 {ranking.context.distanceToPrevious || 0} 分。
+          </span>
         </section>
       )}
+
       <section className="sectionBlock">
         <h2>总排行榜 TOP10</h2>
-        <RankingTable data={ranking.top10} currentPlayerId={player.id} />
+        <RankingTable data={ranking.top10} currentPlayerId={currentPlayer.id} />
       </section>
+
       <section className="sectionBlock">
         <h2>地区平均分</h2>
         <OfficeAverageTable data={ranking.officeAverage} />
       </section>
+
       <section className="sectionBlock">
         <h2>各地区 TOP3</h2>
         <OfficeTop3Panel data={ranking.officeTop3} />
       </section>
+
       <div className="pageActions">
         <Link className="primaryButton" href="/lobby">返回大厅</Link>
       </div>

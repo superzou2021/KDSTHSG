@@ -20,8 +20,10 @@ export default function QuizPage() {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [seconds, setSeconds] = useState(QUIZ_SECONDS);
-  const [existing, setExisting] = useState<ReturnType<typeof getGameResult>>(null);
+  const [existing, setExisting] = useState<Awaited<ReturnType<typeof getGameResult>>>(null);
+  const [existingLoading, setExistingLoading] = useState(true);
   const [modal, setModal] = useState({ open: false, score: 0, total: 0, rank: 0 });
+  const [isLeaving, setIsLeaving] = useState(false);
   const [message, setMessage] = useState("");
 
   // 先定义所有计算变量
@@ -36,13 +38,28 @@ export default function QuizPage() {
   }, [playerId, router]);
 
   useEffect(() => {
+    if (!playerId) {
+      setExisting(null);
+      setExistingLoading(playerId === undefined);
+      return;
+    }
+
+    let active = true;
+    const currentPlayerId = playerId;
     async function loadExisting() {
-      if (playerId) {
-        const result = await getGameResult(playerId, "quiz");
+      setExistingLoading(true);
+      try {
+        const result = await getGameResult(currentPlayerId, "quiz");
+        if (!active) return;
         setExisting(result);
+      } finally {
+        if (active) setExistingLoading(false);
       }
     }
     loadExisting();
+    return () => {
+      active = false;
+    };
   }, [playerId]);
 
   useEffect(() => {
@@ -98,11 +115,26 @@ export default function QuizPage() {
     }
   }, [seconds]); // 简化依赖数组，只监听 seconds
 
-  if (isOpen === false) {
+  const shouldLeaveClosedGame = isOpen === false && !existingLoading && !existing && !modal.open;
+
+  function goLobby() {
+    setIsLeaving(true);
+    router.push("/lobby");
+  }
+
+  if (isLeaving) {
     return (
       <Layout title="Quick Quiz" eyebrow="GAME 02">
-        <section className="statusBanner">该游戏已关闭，请等待现场主持人开启。</section>
-        <button className="primaryButton" type="button" onClick={() => router.push("/lobby")}>
+        <section className="statusBanner">正在跳转...</section>
+      </Layout>
+    );
+  }
+
+  if (shouldLeaveClosedGame) {
+    return (
+      <Layout title="Quick Quiz" eyebrow="GAME 02">
+        <section className="statusBanner">正在同步游戏开放状态...</section>
+        <button className="primaryButton" type="button" onClick={goLobby}>
           回到大厅
         </button>
       </Layout>
@@ -160,7 +192,7 @@ export default function QuizPage() {
       
       <Countdown seconds={seconds} total={QUIZ_SECONDS} currentIndex={currentIndex} totalQuestions={questions.length} />
       
-      {existing && <section className="statusBanner">该游戏已完成，本关得分 {existing.score}，不能重复提交。</section>}
+      {!existingLoading && existing && <section className="statusBanner">该游戏已完成，本关得分 {existing.score}，不能重复提交。</section>}
       
       {currentQuestion && (
         <section className="questionStack">
@@ -202,7 +234,7 @@ export default function QuizPage() {
         </button>
       )}
       
-      <ResultModal open={modal.open} gameName="Quick Quiz" roundScore={modal.score} totalScore={modal.total} rank={modal.rank} onBackLobby={() => router.push("/lobby")} />
+      <ResultModal open={modal.open} gameName="Quick Quiz" roundScore={modal.score} totalScore={modal.total} rank={modal.rank} onBackLobby={goLobby} />
     </Layout>
   );
 }

@@ -9,7 +9,7 @@ import type { GameKey } from "@/types";
 
 export default function AdminControlPage() {
   const { state, refresh } = useAppState();
-  const { toggleGameOpen } = useAdminActions();
+  const { toggleGameOpen, triggerBingoScore } = useAdminActions();
   const [exportText, setExportText] = useState("");
 
   const completion = useMemo(() => {
@@ -18,11 +18,26 @@ export default function AdminControlPage() {
       count: state.gameResults.filter((result) => result.gameKey === key).length
     }));
   }, [state.gameResults]);
+  const bingoGame = state.games.find(g => g.key === "bingo");
+  const bingoCompletionCount = completion.find((item) => item.key === "bingo")?.count || 0;
+  const pendingBingoCount = state.gameResults.filter((result) => result.gameKey === "bingo" && result.pendingBingoScore).length;
+  const bingoScoreTriggered = Boolean(pendingBingoCount === 0 && (bingoGame?.bingoScored || (bingoCompletionCount > 0 && bingoGame?.isOpen === false)));
 
   async function handleToggle(key: GameKey) {
     const nextState = await toggleGameOpen(key);
     const game = nextState.games.find((item) => item.key === key);
     setExportText(`${game?.name || key} 已${game?.isOpen ? "开启" : "关闭"}`);
+    await refresh();
+  }
+
+  async function handleBingoScore() {
+    try {
+      await triggerBingoScore();
+      setExportText("Bingo 判分已触发！");
+      await refresh();
+    } catch (error) {
+      setExportText(error instanceof Error ? `Bingo 判分失败：${error.message}` : "Bingo 判分失败");
+    }
   }
 
   async function handleExport() {
@@ -72,6 +87,25 @@ export default function AdminControlPage() {
               </button>
             </div>
           ))}
+        </div>
+      </section>
+      <section className="sectionBlock">
+        <h2>Bingo 控制</h2>
+        <div className="adminRow" style={{ justifyContent: 'space-between', alignItems: 'center' }}>
+          <div>
+            <b>Bingo 判分</b>
+            <span>
+              状态：{bingoScoreTriggered ? "已触发，Bingo 已关闭" : "待触发"}
+            </span>
+          </div>
+          <button
+            className="primaryButton smallButton"
+            type="button"
+            disabled={bingoScoreTriggered}
+            onClick={handleBingoScore}
+          >
+            {bingoScoreTriggered ? "已触发" : "触发判分"}
+          </button>
         </div>
       </section>
       <section className="sectionBlock">

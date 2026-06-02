@@ -8,7 +8,7 @@ type GameCardProps = {
 
 export default function GameCard({ game, completed }: GameCardProps) {
   const href = `/game/${game.key}`;
-  const status = !game.isOpen ? "未开放" : completed ? "已完成" : "未开始";
+  const status = completed ? "已完成" : game.isOpen ? "未开始" : "未开放";
   const content = (
     <>
       <span className="gameOrder">0{game.order}</span>
@@ -20,7 +20,7 @@ export default function GameCard({ game, completed }: GameCardProps) {
     </>
   );
 
-  if (!game.isOpen) {
+  if (completed || !game.isOpen) {
     return (
       <article className={`demoCard gameEntry ${completed ? "done" : ""} locked`} aria-disabled="true">
         {content}

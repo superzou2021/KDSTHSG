@@ -16,7 +16,8 @@ export default function StoryPage() {
   const isOpen = useGameStatus("story");
   const [currentIndex, setCurrentIndex] = useState(0);
   const [answers, setAnswers] = useState<Record<string, string>>({});
-  const [existing, setExisting] = useState<ReturnType<typeof getGameResult>>(null);
+  const [existing, setExisting] = useState<Awaited<ReturnType<typeof getGameResult>>>(null);
+  const [existingLoading, setExistingLoading] = useState(true);
   const [modal, setModal] = useState({ open: false, score: 0, total: 0, rank: 0 });
   const [message, setMessage] = useState("");
 
@@ -25,13 +26,28 @@ export default function StoryPage() {
   }, [playerId, router]);
 
   useEffect(() => {
+    if (!playerId) {
+      setExisting(null);
+      setExistingLoading(playerId === undefined);
+      return;
+    }
+
+    let active = true;
+    const currentPlayerId = playerId;
     async function loadExisting() {
-      if (playerId) {
-        const result = await getGameResult(playerId, "story");
+      setExistingLoading(true);
+      try {
+        const result = await getGameResult(currentPlayerId, "story");
+        if (!active) return;
         setExisting(result);
+      } finally {
+        if (active) setExistingLoading(false);
       }
     }
     loadExisting();
+    return () => {
+      active = false;
+    };
   }, [playerId]);
 
   const currentQuestion = questions[currentIndex];
@@ -96,7 +112,7 @@ export default function StoryPage() {
         <p style={{ color: 'var(--ink)', margin: '8px 0 0 0', fontSize: '14px' }}>Guess if the story is true or false!</p>
       </div>
       
-      {existing && <section className="statusBanner">该游戏已完成，本关得分 {existing.score}，不能重复提交。</section>}
+      {!existingLoading && existing && <section className="statusBanner">该游戏已完成，本关得分 {existing.score}，不能重复提交。</section>}
       
       {currentQuestion && (
         <section className="questionStack">

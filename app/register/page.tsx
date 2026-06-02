@@ -9,7 +9,7 @@ import { useRegisterPlayer } from "@/hooks/use-game-data";
 export default function RegisterPage() {
   const router = useRouter();
   const register = useRegisterPlayer();
-  const [form, setForm] = useState({ name: "Yolen", phone: "13900001111", office: "北京", team: "Alpha" });
+  const [form, setForm] = useState({ name: "Yolen", phone: "", office: "北京", team: "Alpha" });
   const [message, setMessage] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -34,7 +34,12 @@ export default function RegisterPage() {
     try {
       const result = await register(form);
       setMessage(result.reused ? "该手机号已参与，已加载历史身份。" : "注册成功，正在进入大厅。");
-      router.push("/lobby");
+      router.replace("/lobby");
+      window.setTimeout(() => {
+        if (window.location.pathname !== "/lobby") {
+          window.location.assign("/lobby");
+        }
+      }, 300);
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "注册失败");
       setIsSubmitting(false);

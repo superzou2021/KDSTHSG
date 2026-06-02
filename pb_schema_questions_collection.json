@@ -1,0 +1,125 @@
+[
+  {
+    "id": "pbc_questions000",
+    "name": "questions",
+    "type": "base",
+    "system": false,
+    "fields": [
+      {
+        "id": "text_gamekey000",
+        "name": "gameKey",
+        "type": "text",
+        "system": false,
+        "required": true,
+        "presentable": false,
+        "unique": false,
+        "options": {
+          "min": null,
+          "max": 50,
+          "pattern": ""
+        }
+      },
+      {
+        "id": "text_type000000",
+        "name": "type",
+        "type": "text",
+        "system": false,
+        "required": true,
+        "presentable": false,
+        "unique": false,
+        "options": {
+          "min": null,
+          "max": 50,
+          "pattern": ""
+        }
+      },
+      {
+        "id": "text_title00000",
+        "name": "title",
+        "type": "text",
+        "system": false,
+        "required": true,
+        "presentable": true,
+        "unique": false,
+        "options": {
+          "min": null,
+          "max": 500,
+          "pattern": ""
+        }
+      },
+      {
+        "id": "json_options000",
+        "name": "options",
+        "type": "json",
+        "system": false,
+        "required": false,
+        "presentable": false,
+        "unique": false,
+        "options": {
+          "maxSize": 2000000
+        }
+      },
+      {
+        "id": "json_correct000",
+        "name": "correctAnswer",
+        "type": "json",
+        "system": false,
+        "required": true,
+        "presentable": false,
+        "unique": false,
+        "options": {
+          "maxSize": 2000000
+        }
+      },
+      {
+        "id": "num_score000000",
+        "name": "score",
+        "type": "number",
+        "system": false,
+        "required": true,
+        "presentable": false,
+        "unique": false,
+        "options": {
+          "min": 0,
+          "max": 100,
+          "noDecimal": true
+        }
+      },
+      {
+        "id": "num_order000000",
+        "name": "order",
+        "type": "number",
+        "system": false,
+        "required": true,
+        "presentable": false,
+        "unique": false,
+        "options": {
+          "min": 1,
+          "max": null,
+          "noDecimal": true
+        }
+      },
+      {
+        "id": "bool_active000",
+        "name": "isActive",
+        "type": "bool",
+        "system": false,
+        "required": false,
+        "presentable": false,
+        "unique": false,
+        "options": {}
+      }
+    ],
+    "indexes": [
+      "CREATE INDEX `idx_questions_gameKey` ON `questions` (`gameKey`)",
+      "CREATE INDEX `idx_questions_order` ON `questions` (`order`)",
+      "CREATE INDEX `idx_questions_active` ON `questions` (`isActive`)"
+    ],
+    "listRule": "isActive = true",
+    "viewRule": "isActive = true",
+    "createRule": "@request.auth.id != ''",
+    "updateRule": "@request.auth.id != ''",
+    "deleteRule": "@request.auth.id != ''",
+    "options": {}
+  }
+]

@@ -4,44 +4,134 @@ import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import Layout from "@/components/Layout";
 import ResultModal from "@/components/ResultModal";
+import WaitingModal from "@/components/WaitingModal";
+import { getPlayerRank } from "@/lib/ranking";
 import { calculateBingoScore } from "@/lib/scoring";
 import { getGameResult } from "@/lib/storage";
-import { useCurrentPlayer, useGameStatus, useQuestions, useSubmitGameResult } from "@/hooks/use-game-data";
+import { useCurrentPlayer, useGameStatus, useQuestions, useSubmitGameResult, useAppState } from "@/hooks/use-game-data";
 
 export default function BingoPage() {
   const router = useRouter();
-  const { playerId, refresh } = useCurrentPlayer();
+  const { player, playerId, refresh } = useCurrentPlayer();
+  const { state } = useAppState();
   const questions = useQuestions("bingo");
   const submitGameResult = useSubmitGameResult();
   const isOpen = useGameStatus("bingo");
   const [selectedWords, setSelectedWords] = useState<string[]>([]);
-  const [existing, setExisting] = useState<ReturnType<typeof getGameResult>>(null);
+  const [existing, setExisting] = useState<Awaited<ReturnType<typeof getGameResult>>>(null);
+  const [existingLoading, setExistingLoading] = useState(true);
   const [modal, setModal] = useState({ open: false, score: 0, total: 0, rank: 0 });
+  const [waitingModal, setWaitingModal] = useState(false);
+  const [pendingResult, setPendingResult] = useState<Awaited<ReturnType<typeof submitGameResult>> | null>(null);
+  const [isLeaving, setIsLeaving] = useState(false);
   const [message, setMessage] = useState("");
+  const bingoScored = useMemo(() => {
+    const bingoGame = state.games.find(g => g.key === "bingo");
+    return bingoGame?.bingoScored || false;
+  }, [state.games]);
+  const currentBingoResult = useMemo(() => {
+    if (!playerId) return existing;
+    const stateResult = state.gameResults.find((result) => result.player === playerId && result.gameKey === "bingo") || null;
+    if (existing && !existing.pendingBingoScore) return existing;
+    if (stateResult && !stateResult.pendingBingoScore) return stateResult;
+    return stateResult || existing;
+  }, [existing, playerId, state.gameResults]);
+  const isBingoSettled = Boolean((currentBingoResult && !currentBingoResult.pendingBingoScore) || bingoScored);
+  const isWaitingForBingoScore = Boolean((pendingResult || currentBingoResult?.pendingBingoScore) && !isBingoSettled);
+  const hasSubmittedBingo = Boolean(currentBingoResult || pendingResult);
 
   useEffect(() => {
     if (playerId === null) router.push("/register");
   }, [playerId, router]);
 
   useEffect(() => {
+    if (!playerId) {
+      setExisting(null);
+      setExistingLoading(playerId === undefined);
+      return;
+    }
+
+    let active = true;
+    const currentPlayerId = playerId;
     async function loadExisting() {
-      if (playerId) {
-        const result = await getGameResult(playerId, "bingo");
+      setExistingLoading(true);
+      try {
+        const result = await getGameResult(currentPlayerId, "bingo");
+        if (!active) return;
         setExisting(result);
+      } finally {
+        if (active) setExistingLoading(false);
       }
     }
     loadExisting();
+    return () => {
+      active = false;
+    };
   }, [playerId]);
+
+  useEffect(() => {
+    if (!playerId || (!waitingModal && !pendingResult && !currentBingoResult?.pendingBingoScore)) return;
+
+    let active = true;
+    async function pollBingoResult() {
+      const result = await getGameResult(playerId as string, "bingo");
+      if (active && result) {
+        setExisting(result);
+      }
+    }
+
+    pollBingoResult();
+    const timer = window.setInterval(pollBingoResult, 1000);
+    return () => {
+      active = false;
+      window.clearInterval(timer);
+    };
+  }, [currentBingoResult?.pendingBingoScore, pendingResult, playerId, waitingModal]);
 
   const targetWords = useMemo(() => questions.filter((question) => question.correctAnswer).map((question) => question.title), [questions]);
   const correctCount = selectedWords.filter((word) => targetWords.includes(word)).length + (selectedWords.length === 9 && selectedWords.every((word) => targetWords.includes(word)) ? 1 : 0);
   const previewScore = calculateBingoScore(correctCount);
 
-  if (isOpen === false) {
+  useEffect(() => {
+    const shouldSettle = isBingoSettled && (waitingModal || Boolean(pendingResult) || Boolean(currentBingoResult));
+    if (!shouldSettle) return;
+
+    const latestResult = currentBingoResult || pendingResult?.result;
+    const latestPlayer = playerId ? state.players.find((item) => item.id === playerId) || player || pendingResult?.player : null;
+    if (latestResult && latestPlayer) {
+      const totalScore = latestPlayer.completedGames.includes("bingo")
+        ? latestPlayer.totalScore
+        : latestPlayer.totalScore + latestResult.score;
+      setWaitingModal(false);
+      setModal({
+        open: true,
+        score: latestResult.score,
+        total: totalScore,
+        rank: getPlayerRank(state.players, latestPlayer.id)
+      });
+    }
+  }, [currentBingoResult, isBingoSettled, pendingResult, player, playerId, state.players, waitingModal]);
+
+  const shouldLeaveClosedGame = isOpen === false && !isWaitingForBingoScore && !modal.open && !pendingResult && !currentBingoResult;
+
+  function goLobby() {
+    setIsLeaving(true);
+    router.push("/lobby");
+  }
+
+  if (isLeaving) {
     return (
       <Layout title="Bingo 猜词" eyebrow="GAME 01">
-        <section className="statusBanner">该游戏已关闭，请等待现场主持人开启。</section>
-        <button className="primaryButton" type="button" onClick={() => router.push("/lobby")}>
+        <section className="statusBanner">正在跳转...</section>
+      </Layout>
+    );
+  }
+
+  if (shouldLeaveClosedGame) {
+    return (
+      <Layout title="Bingo 猜词" eyebrow="GAME 01">
+        <section className="statusBanner">正在同步游戏开放状态...</section>
+        <button className="primaryButton" type="button" onClick={goLobby}>
           回到大厅
         </button>
       </Layout>
@@ -49,7 +139,7 @@ export default function BingoPage() {
   }
 
   function toggleWord(word: string) {
-    if (isOpen !== true || existing) return;
+    if (isOpen !== true || hasSubmittedBingo) return;
     setSelectedWords((current) => {
       if (current.includes(word)) return current.filter((item) => item !== word);
       if (current.length >= 9) return current;
@@ -72,11 +162,12 @@ export default function BingoPage() {
         playerId,
         gameKey: "bingo",
         answers: { selectedWords, targetWords, correctCount },
-        score: previewScore
+        score: previewScore,
+        pendingBingoScore: true
       });
       refresh();
-      setExisting(outcome.result);
-      setModal({ open: true, score: outcome.result.score, total: outcome.player.totalScore, rank: outcome.rank });
+      setPendingResult(outcome);
+      setWaitingModal(true);
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "提交失败");
     }
@@ -92,13 +183,11 @@ export default function BingoPage() {
         <p style={{ color: 'var(--ink)', margin: '8px 0 0 0', fontSize: '14px' }}>Guess the right words and get Bingo!</p>
       </div>
       
-      {existing && <section className="statusBanner">该游戏已完成，本关得分 {existing.score}，不能重复提交。</section>}
-      
       <section className="wordBank">
         {questions.map((question) => (
           <button
             className={selectedWords.includes(question.title) ? "selected" : ""}
-            disabled={Boolean(existing) || isOpen !== true}
+            disabled={hasSubmittedBingo || isOpen !== true}
             key={question.id}
             type="button"
             onClick={() => toggleWord(question.title)}
@@ -121,11 +210,12 @@ export default function BingoPage() {
         <span>{message || "请从词库中选择 9 个词组成 Bingo 宫格。"}</span>
       </section>
       
-      <button className="primaryButton" type="button" disabled={Boolean(existing) || isOpen !== true || selectedWords.length !== 9} onClick={handleSubmit}>
+      <button className="primaryButton" type="button" disabled={hasSubmittedBingo || isOpen !== true || selectedWords.length !== 9} onClick={handleSubmit}>
         提交 Bingo
       </button>
       
-      <ResultModal open={modal.open} gameName="Bingo 猜词" roundScore={modal.score} totalScore={modal.total} rank={modal.rank} onBackLobby={() => router.push("/lobby")} />
+      <ResultModal open={modal.open} gameName="Bingo 猜词" roundScore={modal.score} totalScore={modal.total} rank={modal.rank} onBackLobby={goLobby} />
+      <WaitingModal open={waitingModal || isWaitingForBingoScore} gameName="Bingo 猜词" />
     </Layout>
   );
 }

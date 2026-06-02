@@ -21,6 +21,7 @@ export type Game = {
   maxScore: number;
   isOpen: boolean;
   order: number;
+  bingoScored?: boolean;
 };
 
 export type Question = {
@@ -43,6 +44,7 @@ export type GameResult = {
   score: number;
   maxScore: number;
   completedAt: string;
+  pendingBingoScore?: boolean;
 };
 
 export type RankingItem = {

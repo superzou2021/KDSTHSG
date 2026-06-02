@@ -76,7 +76,7 @@
         "id": "field_ou8h3fsbl5ui96a",
         "name": "totalScore",
         "type": "number",
-        "required": true,
+        "required": false,
         "presentable": false,
         "unique": false,
         "options": {
@@ -90,7 +90,7 @@
         "id": "field_tdqt91fdf8h37fi",
         "name": "completedGames",
         "type": "json",
-        "required": true,
+        "required": false,
         "presentable": false,
         "unique": false,
         "options": {
@@ -102,7 +102,7 @@
         "id": "field_nt9kegzg61u3blq",
         "name": "finalSubmitted",
         "type": "bool",
-        "required": true,
+        "required": false,
         "presentable": false,
         "unique": false,
         "options": {}
@@ -189,7 +189,7 @@
         "id": "field_wzioey3jxr43dvn",
         "name": "score",
         "type": "number",
-        "required": true,
+        "required": false,
         "presentable": false,
         "unique": false,
         "options": {
@@ -225,6 +225,16 @@
           "max": null,
           "pattern": ""
         }
+      },
+      {
+        "system": false,
+        "id": "field_pending_bingo_score",
+        "name": "pendingBingoScore",
+        "type": "bool",
+        "required": false,
+        "presentable": false,
+        "unique": false,
+        "options": {}
       }
     ],
     "indexes": [
@@ -296,7 +306,7 @@
         "id": "field_02uci8h2yh52aqw",
         "name": "isOpen",
         "type": "bool",
-        "required": true,
+        "required": false,
         "presentable": false,
         "unique": false,
         "options": {}
@@ -314,6 +324,16 @@
           "max": 4,
           "noDecimal": false
         }
+      },
+      {
+        "system": false,
+        "id": "field_bingo_scored",
+        "name": "bingoScored",
+        "type": "bool",
+        "required": false,
+        "presentable": false,
+        "unique": false,
+        "options": {}
       }
     ],
     "indexes": [

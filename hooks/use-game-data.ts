@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import type { AppState, GameKey, Player } from "@/types";
+import type { AppState, GameKey, Player, Question } from "@/types";
 import {
   getCurrentPlayer,
   getCurrentPlayerId,
@@ -15,8 +15,11 @@ import {
   registerPlayer,
   submitGameResult,
   toggleGameOpen,
+  triggerBingoScore,
   subscribeToState
 } from "@/lib/storage";
+
+const STATE_REFRESH_INTERVAL_MS = 1500;
 
 export function useAppState() {
   const [state, setState] = useState<AppState>(getInitialState());
@@ -31,7 +34,12 @@ export function useAppState() {
   useEffect(() => {
     refresh();
     const unsubscribe = subscribeToState(refresh);
-    return unsubscribe;
+
+    const timer = window.setInterval(refresh, STATE_REFRESH_INTERVAL_MS);
+    return () => {
+      unsubscribe();
+      window.clearInterval(timer);
+    };
   }, [refresh]);
 
   return { state, refresh, loading };
@@ -39,21 +47,39 @@ export function useAppState() {
 
 export function useCurrentPlayer() {
   const [player, setPlayer] = useState<Player | null>(null);
+  const [playerId, setPlayerId] = useState<string | null | undefined>(undefined);
   const [loading, setLoading] = useState(true);
 
   const refresh = useCallback(async () => {
-    const p = await getCurrentPlayer();
-    setPlayer(p);
-    setLoading(false);
+    try {
+      const id = await getCurrentPlayerId();
+      setPlayerId(id);
+      if (!id) {
+        setPlayer(null);
+        return;
+      }
+      const p = await getCurrentPlayer();
+      setPlayer(p);
+    } catch {
+      setPlayer(null);
+      setPlayerId(null);
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
   useEffect(() => {
     refresh();
     const unsubscribe = subscribeToState(refresh);
-    return unsubscribe;
+
+    const timer = window.setInterval(refresh, STATE_REFRESH_INTERVAL_MS);
+    return () => {
+      unsubscribe();
+      window.clearInterval(timer);
+    };
   }, [refresh]);
 
-  return { player, playerId: getCurrentPlayerId(), refresh, loading };
+  return { player, playerId, refresh, loading };
 }
 
 export function useRegisterPlayer() {
@@ -61,7 +87,7 @@ export function useRegisterPlayer() {
 }
 
 export function useQuestions(gameKey: GameKey) {
-  const [questions, setQuestions] = useState<any[]>([]);
+  const [questions, setQuestions] = useState<Question[]>([]);
   const [loading, setLoading] = useState(true);
 
   const refresh = useCallback(async () => {
@@ -90,7 +116,12 @@ export function useGameStatus(gameKey: GameKey) {
   useEffect(() => {
     refresh();
     const unsubscribe = subscribeToState(refresh);
-    return unsubscribe;
+
+    const timer = window.setInterval(refresh, STATE_REFRESH_INTERVAL_MS);
+    return () => {
+      unsubscribe();
+      window.clearInterval(timer);
+    };
   }, [refresh]);
 
   return open;
@@ -115,50 +146,78 @@ export function useExistingResult(playerId: string | null | undefined, gameKey: 
   useEffect(() => {
     refresh();
     const unsubscribe = subscribeToState(refresh);
-    return unsubscribe;
+
+    const timer = window.setInterval(refresh, STATE_REFRESH_INTERVAL_MS);
+    return () => {
+      unsubscribe();
+      window.clearInterval(timer);
+    };
   }, [refresh]);
 
   return exists;
 }
 
 export function useLobbySnapshot(playerId: string | null | undefined) {
-  const [snapshot, setSnapshot] = useState<any>(null);
+  const [snapshot, setSnapshot] = useState<Awaited<ReturnType<typeof getLobbySnapshot>> | null>(null);
   const [loading, setLoading] = useState(true);
 
   const refresh = useCallback(async () => {
-    if (playerId) {
-      const s = await getLobbySnapshot(playerId);
-      setSnapshot(s);
+    try {
+      if (playerId) {
+        const s = await getLobbySnapshot(playerId);
+        setSnapshot(s);
+      } else {
+        setSnapshot(null);
+      }
+    } catch {
+      setSnapshot(null);
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   }, [playerId]);
 
   useEffect(() => {
     refresh();
     const unsubscribe = subscribeToState(refresh);
-    return unsubscribe;
+    const timer = window.setInterval(refresh, STATE_REFRESH_INTERVAL_MS);
+    return () => {
+      unsubscribe();
+      window.clearInterval(timer);
+    };
   }, [refresh]);
 
   return { snapshot, refresh, loading };
 }
 
 export function useRanking(playerId?: string | null, intervalMs?: number) {
-  const [ranking, setRanking] = useState<any>(null);
+  const [ranking, setRanking] = useState<Awaited<ReturnType<typeof getRankingSnapshot>>>(() => {
+    const state = getInitialState();
+    return {
+      players: state.players,
+      games: state.games,
+      results: state.gameResults,
+      top10: [],
+      officeAverage: [],
+      officeTop3: [],
+      context: null
+    };
+  });
   const [loading, setLoading] = useState(true);
 
   const refresh = useCallback(async () => {
-    const r = await getRankingSnapshot(playerId);
-    setRanking(r);
-    setLoading(false);
+    try {
+      const r = await getRankingSnapshot(playerId);
+      setRanking(r);
+    } finally {
+      setLoading(false);
+    }
   }, [playerId]);
 
   useEffect(() => {
     refresh();
     const unsubscribe = subscribeToState(refresh);
 
-    if (!intervalMs) return unsubscribe;
-
-    const timer = window.setInterval(refresh, intervalMs);
+    const timer = window.setInterval(refresh, intervalMs || STATE_REFRESH_INTERVAL_MS);
     return () => {
       unsubscribe();
       window.clearInterval(timer);
@@ -169,5 +228,5 @@ export function useRanking(playerId?: string | null, intervalMs?: number) {
 }
 
 export function useAdminActions() {
-  return { toggleGameOpen };
+  return { toggleGameOpen, triggerBingoScore };
 }

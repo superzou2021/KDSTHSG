@@ -97,3 +97,55 @@ test("所有评分函数都返回 0-100 之间的整数", () => {
     assert.ok(Number.isInteger(score), `calculateStoryScore(${JSON.stringify(testCase)}) = ${score} 不是整数`);
   }
 });
+
+// ========== 新增：极端情况测试 ==========
+test("calculateBingoScore: 极端值测试", () => {
+  assert.equal(calculateBingoScore(0), 0);
+  assert.equal(calculateBingoScore(1), 10);
+  assert.equal(calculateBingoScore(10), 100);
+  assert.equal(calculateBingoScore(-100), 0);
+  assert.equal(calculateBingoScore(1000), 100);
+  assert.equal(calculateBingoScore(5.5), 55); // 小数不被取整
+});
+
+test("calculateQuizScore: 极端值测试", () => {
+  assert.equal(calculateQuizScore(0), 0);
+  assert.equal(calculateQuizScore(10), 100);
+  assert.equal(calculateQuizScore(-50), 0);
+  assert.equal(calculateQuizScore(100), 100);
+  assert.equal(calculateQuizScore(7.3), 73); // 小数不被取整
+});
+
+test("calculateStoryScore: 各种组合测试", () => {
+  assert.equal(calculateStoryScore([true, false, true]), 60); // 两个对
+  assert.equal(calculateStoryScore([false, true, false]), 30); // 一个对
+  assert.equal(calculateStoryScore([false, false, true, true]), 60); // 两个对
+  assert.equal(calculateStoryScore([true, true, true, true, true]), 100); // 封顶
+});
+
+test("calculateEliminationScore: 极端值测试", () => {
+  assert.equal(calculateEliminationScore(0), 0);
+  assert.equal(calculateEliminationScore(5), 100);
+  assert.equal(calculateEliminationScore(-10), 0);
+  assert.equal(calculateEliminationScore(100), 100);
+  assert.equal(calculateEliminationScore(3.7), 74); // 小数不被取整
+});
+
+// ========== 新增：NaN和非数字输入测试 ==========
+test("评分函数: NaN输入处理", () => {
+  assert.ok(isNaN(calculateBingoScore(NaN)));
+  assert.ok(isNaN(calculateQuizScore(NaN)));
+  assert.ok(isNaN(calculateEliminationScore(NaN)));
+});
+
+test("评分函数: 非数字输入处理", () => {
+  // undefined 会转换为 NaN
+  assert.ok(isNaN(calculateBingoScore(undefined as any)));
+  assert.ok(isNaN(calculateQuizScore(undefined as any)));
+  assert.ok(isNaN(calculateEliminationScore(undefined as any)));
+  
+  // null 会转换为 0
+  assert.equal(calculateBingoScore(null as any), 0);
+  assert.equal(calculateQuizScore(null as any), 0);
+  assert.equal(calculateEliminationScore(null as any), 0);
+});
