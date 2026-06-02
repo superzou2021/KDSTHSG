@@ -334,6 +334,20 @@
         "presentable": false,
         "unique": false,
         "options": {}
+      },
+      {
+        "system": false,
+        "id": "field_quiz_current_group",
+        "name": "quizCurrentGroup",
+        "type": "number",
+        "required": false,
+        "presentable": false,
+        "unique": false,
+        "options": {
+          "min": 0,
+          "max": 5,
+          "noDecimal": false
+        }
       }
     ],
     "indexes": [

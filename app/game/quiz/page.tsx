@@ -22,6 +22,7 @@ export default function QuizPage() {
   const isOpen = useGameStatus("quiz");
   const { state } = useAppState();
   const quizGame = state.games.find(g => g.key === "quiz");
+  const quizIsOpen = Boolean(quizGame?.isOpen || isOpen === true);
   const currentGroup = quizGame?.quizCurrentGroup || 0;
   
   const [hasStarted, setHasStarted] = useState(false);
@@ -94,14 +95,14 @@ export default function QuizPage() {
 
   // 倒计时逻辑
   useEffect(() => {
-    if (!hasStarted || waitingForNextGroup || modal.open || existing || isOpen !== true) return;
+    if (!hasStarted || waitingForNextGroup || modal.open || existing || !quizIsOpen) return;
     const timer = window.setInterval(() => setSeconds((value) => Math.max(0, value - 1)), 1000);
     return () => window.clearInterval(timer);
-  }, [hasStarted, waitingForNextGroup, modal.open, existing, isOpen]);
+  }, [hasStarted, waitingForNextGroup, modal.open, existing, quizIsOpen]);
 
   // 时间到逻辑
   useEffect(() => {
-    if (seconds > 0 || !hasStarted || waitingForNextGroup || modal.open || existing || isOpen !== true) return;
+    if (seconds > 0 || !hasStarted || waitingForNextGroup || modal.open || existing || !quizIsOpen) return;
     
     if (isLastGroup && isGroupComplete) {
       submitAllAnswers();
@@ -110,9 +111,9 @@ export default function QuizPage() {
       setWaitingForNextGroup(true);
       setMessage("等待后台开启下一板块...");
     }
-  }, [seconds, hasStarted, waitingForNextGroup, modal.open, existing, isOpen, isLastGroup, isGroupComplete]);
+  }, [seconds, hasStarted, waitingForNextGroup, modal.open, existing, quizIsOpen, isLastGroup, isGroupComplete]);
 
-  const shouldLeaveClosedGame = isOpen === false && !existingLoading && !existing && !modal.open;
+  const shouldLeaveClosedGame = isOpen === false && !quizGame?.isOpen && !existingLoading && !existing && !modal.open;
 
   function goLobby() {
     setIsLeaving(true);
@@ -125,7 +126,7 @@ export default function QuizPage() {
   }
 
   function chooseAnswer(option: string) {
-    if (!currentQuestion || isOpen !== true || existing || waitingForNextGroup || !hasStarted) return;
+    if (!currentQuestion || !quizIsOpen || existing || waitingForNextGroup || !hasStarted) return;
     setAnswers((current) => ({ ...current, [currentQuestion.id]: option }));
     setMessage("");
   }
@@ -202,7 +203,7 @@ export default function QuizPage() {
               {currentQuestion.options?.map((option, idx) => (
                 <button
                   className={selectedAnswer === option ? "selected" : ""}
-                  disabled={Boolean(existing) || isOpen !== true || waitingForNextGroup || !hasStarted}
+                  disabled={Boolean(existing) || !quizIsOpen || waitingForNextGroup || !hasStarted}
                   key={option}
                   type="button"
                   onClick={() => chooseAnswer(option)}
@@ -233,13 +234,13 @@ export default function QuizPage() {
       )}
 
       {hasStarted && !waitingForNextGroup && currentQuestion && (
-        <button className="primaryButton" disabled={Boolean(existing) || isOpen !== true || !selectedAnswer} type="button" onClick={goNext}>
+        <button className="primaryButton" disabled={Boolean(existing) || !quizIsOpen || !selectedAnswer} type="button" onClick={goNext}>
           {isGroupComplete && isLastGroup ? "提交成绩" : isGroupComplete ? "完成本板块" : "继续"}
         </button>
       )}
 
       <QuizStartModal
-        open={showStartModal && !existing && isOpen === true}
+        open={showStartModal && !existing && quizIsOpen}
         onStart={handleStart}
       />
 

@@ -27,18 +27,25 @@ export default function AdminControlPage() {
   const quizCompleted = quizCurrentGroup >= 5; // 5个板块（每组2题）
   const quizCompletionCount = completion.find((item) => item.key === "quiz")?.count || 0;
 
+  async function refreshMultiple(times: number = 3) {
+    for (let i = 0; i < times; i++) {
+      await refresh();
+      await new Promise(resolve => setTimeout(resolve, 200));
+    }
+  }
+
   async function handleToggle(key: GameKey) {
     const nextState = await toggleGameOpen(key);
     const game = nextState.games.find((item) => item.key === key);
     setExportText(`${game?.name || key} 已${game?.isOpen ? "开启" : "关闭"}`);
-    await refresh();
+    await refreshMultiple();
   }
 
   async function handleBingoScore() {
     try {
       await triggerBingoScore();
       setExportText("Bingo 判分已触发！");
-      await refresh();
+      await refreshMultiple();
     } catch (error) {
       setExportText(error instanceof Error ? `Bingo 判分失败：${error.message}` : "Bingo 判分失败");
     }
@@ -48,7 +55,7 @@ export default function AdminControlPage() {
     try {
       await advanceQuizGroup();
       setExportText(`Sector Quiz 已进入第 ${quizCurrentGroup + 1} 板块！`);
-      await refresh();
+      await refreshMultiple();
     } catch (error) {
       setExportText(error instanceof Error ? `Sector Quiz 操作失败：${error.message}` : "Sector Quiz 操作失败");
     }

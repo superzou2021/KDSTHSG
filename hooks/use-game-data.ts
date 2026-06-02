@@ -20,7 +20,7 @@ import {
   subscribeToState
 } from "@/lib/storage";
 
-const STATE_REFRESH_INTERVAL_MS = 1500;
+const STATE_REFRESH_INTERVAL_MS = 500;
 
 export function useAppState() {
   const [state, setState] = useState<AppState>(getInitialState());

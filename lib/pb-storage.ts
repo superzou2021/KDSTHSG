@@ -107,6 +107,36 @@ export async function ensureGameState(): Promise<void> {
       for (const game of GAMES) {
         await pb.collection("games").create(game);
       }
+    } else {
+      // 更新已有的游戏记录，确保包含所有字段
+      for (const game of GAMES) {
+        const existingGame = list.find(g => g.key === game.key);
+        if (existingGame) {
+          let shouldUpdate = false;
+          const updateData: Record<string, unknown> = {};
+          
+          // 检查并添加缺失的字段
+          if (game.key === "bingo") {
+            if (existingGame.bingoScored === undefined) {
+              updateData.bingoScored = false;
+              shouldUpdate = true;
+            }
+          }
+          if (game.key === "quiz") {
+            if (existingGame.quizCurrentGroup === undefined) {
+              updateData.quizCurrentGroup = 0;
+              shouldUpdate = true;
+            }
+          }
+          
+          if (shouldUpdate) {
+            await pb.collection("games").update(existingGame.id, updateData);
+          }
+        } else {
+          // 如果游戏不存在，则创建
+          await pb.collection("games").create(game);
+        }
+      }
     }
   } catch {
     for (const game of GAMES) {
@@ -157,10 +187,11 @@ export async function loadStateFromPB(): Promise<AppState> {
   }
 
   try {
+    // 使用 $autoCancel: false 确保状态加载不会被其他请求中断
     const [players, gameResults, games] = await Promise.all([
-      pb.collection("players").getFullList(),
-      pb.collection("game_results").getFullList({ sort: "completedAt" }),
-      pb.collection("games").getFullList({ sort: "order" })
+      pb.collection("players").getFullList({ $autoCancel: false }),
+      pb.collection("game_results").getFullList({ sort: "completedAt", $autoCancel: false }),
+      pb.collection("games").getFullList({ sort: "order", $autoCancel: false })
     ]);
 
     const mappedPlayers: Player[] = players.map(mapPlayerRecord);
@@ -183,7 +214,8 @@ export async function loadStateFromPB(): Promise<AppState> {
       games: mappedGames.length > 0 ? mappedGames : GAMES,
       questions: QUESTIONS
     };
-  } catch {
+  } catch (error) {
+    console.error("❌ loadStateFromPB 失败:", error);
     return getInitialState();
   }
 }
@@ -351,7 +383,7 @@ export async function toggleGameOpen(gameKey: GameKey): Promise<AppState> {
 
   const available = await checkPocketBase();
   if (available) {
-    const list = await pb.collection("games").getFullList();
+    const list = await pb.collection("games").getFullList({ $autoCancel: false });
     for (const game of newGames) {
       const existing = list.find(g => g.key === game.key);
       if (existing) {
@@ -362,7 +394,7 @@ export async function toggleGameOpen(gameKey: GameKey): Promise<AppState> {
         if (game.key === "quiz") {
           data.quizCurrentGroup = game.quizCurrentGroup || 0;
         }
-        await pb.collection("games").update(existing.id, data);
+        await pb.collection("games").update(existing.id, data, { $autoCancel: false });
       }
     }
   }
@@ -372,35 +404,110 @@ export async function toggleGameOpen(gameKey: GameKey): Promise<AppState> {
 }
 
 export async function triggerBingoScore(): Promise<AppState> {
-  const state = settlePendingBingoResults(await loadState());
+  console.log("🎮 triggerBingoScore: 开始执行");
+  
+  let state = await loadState();
+  console.log("📊 加载的当前状态：", {
+    playersCount: state.players.length,
+    gameResultsCount: state.gameResults.length,
+    bingoPendingCount: state.gameResults.filter(r => r.gameKey === "bingo" && r.pendingBingoScore).length
+  });
+  
+  // 手动处理 BINGO 判分，将 bingo 加入玩家的 completedGames
+  const gameResults = state.gameResults.map((result) => {
+    if (result.gameKey !== "bingo" || !result.pendingBingoScore) return result;
+    return {
+      ...result,
+      answers: { ...result.answers, pendingBingoScore: false },
+      pendingBingoScore: false
+    };
+  });
+
+  console.log("✅ 处理后的 gameResults");
+
+  const players = state.players.map((player) => {
+    const playerResults = gameResults.filter((result) => result.player === player.id && !result.pendingBingoScore);
+    const completedGames = [...new Set(playerResults.map((result) => result.gameKey))] as GameKey[];
+    const finalSubmitted = GAME_ORDER.every((key) => completedGames.includes(key));
+    const totalScore = playerResults.reduce((sum, result) => sum + result.score, 0);
+
+    console.log(`👤 处理玩家 ${player.name}：`, {
+      beforeCompletedGames: player.completedGames,
+      afterCompletedGames: completedGames,
+      beforeTotalScore: player.totalScore,
+      afterTotalScore: totalScore
+    });
+
+    return {
+      ...player,
+      totalScore,
+      completedGames,
+      finalSubmitted,
+      finalCompletedAt: finalSubmitted ? player.finalCompletedAt || nowIso() : player.finalCompletedAt,
+      updated: nowIso()
+    };
+  });
+
   const newGames = state.games.map((game) => (game.key === "bingo" ? { ...game, isOpen: false, bingoScored: true } : game));
-  const newState = { ...state, games: newGames };
+  const newState = { ...state, players, gameResults, games: newGames };
 
   const available = await checkPocketBase();
   if (available) {
-    const pendingResults = await pb.collection("game_results").getFullList({ filter: "gameKey = 'bingo'" });
-    for (const result of pendingResults) {
-      if (mapPendingBingoScore(result)) {
-        await pb.collection("game_results").update(result.id, {
-          pendingBingoScore: false,
-          answers: { ...result.answers, pendingBingoScore: false }
-        });
+    console.log("🔌 PocketBase 可用，开始同步数据...");
+    
+    try {
+      // 使用 $autoCancel: false 禁用自动取消，防止请求被轮询中断
+      const pendingResults = await pb.collection("game_results").getFullList({ 
+        filter: "gameKey = 'bingo'",
+        $autoCancel: false 
+      });
+      console.log(`📝 找到 ${pendingResults.length} 条 BINGO 结果`);
+      
+      for (const result of pendingResults) {
+        if (mapPendingBingoScore(result)) {
+          console.log(`✓ 更新 game_result ${result.id}: pendingBingoScore=false`);
+          await pb.collection("game_results").update(result.id, {
+            pendingBingoScore: false,
+            answers: { ...result.answers, pendingBingoScore: false }
+          }, { $autoCancel: false });
+        }
       }
-    }
 
-    for (const player of newState.players) {
-      await pb.collection("players").update(player.id, buildPlayerUpdate(player));
-    }
+      for (const player of newState.players) {
+        console.log(`✓ 更新玩家 ${player.name}:`, {
+          totalScore: player.totalScore,
+          completedGames: player.completedGames
+        });
+        await pb.collection("players").update(player.id, buildPlayerUpdate(player), { $autoCancel: false });
+      }
 
-    const list = await pb.collection("games").getFullList();
-    const bingo = list.find(g => g.key === "bingo");
-    if (bingo) {
-      await pb.collection("games").update(bingo.id, { isOpen: false, bingoScored: true });
+      const list = await pb.collection("games").getFullList({ $autoCancel: false });
+      const bingo = list.find(g => g.key === "bingo");
+      if (bingo) {
+        console.log(`✓ 更新 BINGO 游戏状态：isOpen=false, bingoScored=true`);
+        await pb.collection("games").update(bingo.id, { isOpen: false, bingoScored: true }, { $autoCancel: false });
+      }
+
+      console.log("✅ PocketBase 数据同步完成");
+    } catch (error) {
+      console.error("❌ PocketBase 同步失败:", error);
+      throw error;
     }
   }
 
   await saveState(newState);
-  return available ? await loadState() : newState;
+  
+  // 强制重新加载状态，确保获取最新数据
+  const finalState = available ? await loadStateFromPB() : newState;
+  
+  console.log("🎯 triggerBingoScore: 执行完成");
+  console.log("📊 最终状态验证：");
+  console.log(`  游戏状态: bingo.isOpen=${finalState.games.find(g => g.key === 'bingo')?.isOpen}, bingo.bingoScored=${finalState.games.find(g => g.key === 'bingo')?.bingoScored}`);
+  finalState.players.forEach(p => {
+    console.log(`  👤 ${p.name}: completedGames=${JSON.stringify(p.completedGames)}, totalScore=${p.totalScore}`);
+  });
+  
+  return finalState;
 }
 
 export async function advanceQuizGroup(): Promise<AppState> {
@@ -414,11 +521,11 @@ export async function advanceQuizGroup(): Promise<AppState> {
 
   const available = await checkPocketBase();
   if (available) {
-    const list = await pb.collection("games").getFullList();
+    const list = await pb.collection("games").getFullList({ $autoCancel: false });
     const quiz = list.find(g => g.key === "quiz");
     if (quiz) {
       const nextGroup = (quiz.quizCurrentGroup || 0) + 1;
-      await pb.collection("games").update(quiz.id, { quizCurrentGroup: nextGroup });
+      await pb.collection("games").update(quiz.id, { quizCurrentGroup: nextGroup }, { $autoCancel: false });
     }
   }
 
@@ -468,7 +575,7 @@ export async function submitGameResult(input: {
       maxScore: result.maxScore,
       completedAt: result.completedAt,
       pendingBingoScore: Boolean(input.pendingBingoScore)
-    });
+    }, { $autoCancel: false });
     result.id = created.id;
   }
 
@@ -497,7 +604,7 @@ export async function submitGameResult(input: {
   };
 
   if (available) {
-    await pb.collection("players").update(player.id, buildPlayerUpdate(player));
+    await pb.collection("players").update(player.id, buildPlayerUpdate(player), { $autoCancel: false });
   }
 
   const newState: AppState = {
