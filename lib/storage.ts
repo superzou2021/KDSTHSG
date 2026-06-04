@@ -120,6 +120,66 @@ export async function getCurrentPlayer(): Promise<Player | null> {
   return getCachedPlayer(playerId);
 }
 
+export async function restoreCurrentPlayerFromLocal(): Promise<Player | null> {
+  const available = await checkBackend();
+  if (available) {
+    return await pbStorage.restoreCurrentPlayerFromLocal();
+  }
+
+  if (!isBrowser()) return null;
+  const playerId = window.localStorage.getItem(PLAYER_ID_KEY);
+  const phone = window.localStorage.getItem(PLAYER_PHONE_KEY);
+  if (!playerId && !phone) return null;
+
+  const cached = getCachedPlayer(playerId || undefined);
+  if (cached) return cached;
+
+  const state = loadStateLocal();
+  if (playerId) {
+    const p = state.players.find((item) => item.id === playerId);
+    if (p) {
+      setCachedPlayer(p);
+      return p;
+    }
+  }
+  if (phone) {
+    const p = state.players.find((item) => item.phone === phone);
+    if (p) {
+      setCachedPlayer(p);
+      window.localStorage.setItem(PLAYER_ID_KEY, p.id);
+      window.localStorage.setItem(PLAYER_PHONE_KEY, p.phone);
+      return p;
+    }
+  }
+  clearCurrentPlayer();
+  return null;
+}
+
+export async function findPlayerByPhone(phone: string): Promise<Player | null> {
+  const available = await checkBackend();
+  if (available) {
+    return await pbStorage.findPlayerByPhone(phone);
+  }
+  const state = loadStateLocal();
+  return state.players.find((item) => item.phone === phone) || null;
+}
+
+export function saveCurrentPlayer(player: Player): void {
+  if (!isBrowser()) return;
+  window.localStorage.setItem(PLAYER_ID_KEY, player.id);
+  if (player.phone) {
+    window.localStorage.setItem(PLAYER_PHONE_KEY, player.phone);
+  }
+  setCachedPlayer(player);
+}
+
+export function clearCurrentPlayer(): void {
+  if (!isBrowser()) return;
+  window.localStorage.removeItem(PLAYER_ID_KEY);
+  window.localStorage.removeItem(PLAYER_PHONE_KEY);
+  window.localStorage.removeItem(PLAYER_CACHE_KEY);
+}
+
 export function validatePhone(phone: string): boolean {
   if (!phone || phone.length !== 11) return false;
   if (phone[0] !== '1') return false;

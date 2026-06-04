@@ -267,6 +267,77 @@ export async function getCurrentPlayer(): Promise<Player | null> {
   return getCachedPlayer(playerId);
 }
 
+export function saveCurrentPlayer(player: Player): void {
+  if (!isBrowser()) return;
+  window.localStorage.setItem(PLAYER_ID_KEY, player.id);
+  if (player.phone) {
+    window.localStorage.setItem(PLAYER_PHONE_KEY, player.phone);
+  }
+  setCachedPlayer(player);
+}
+
+export function clearCurrentPlayer(): void {
+  if (!isBrowser()) return;
+  window.localStorage.removeItem(PLAYER_ID_KEY);
+  window.localStorage.removeItem(PLAYER_PHONE_KEY);
+  window.localStorage.removeItem(PLAYER_CACHE_KEY);
+}
+
+export async function findPlayerByPhone(phone: string): Promise<Player | null> {
+  const trimmed = (phone || "").trim();
+  if (!trimmed) return null;
+  const available = await checkPocketBase();
+  if (available) {
+    try {
+      const record = await pb.collection("players").getFirstListItem(
+        pb.filter("phone = {:phone}", { phone: trimmed })
+      );
+      return record ? mapPlayerRecord(record) : null;
+    } catch {
+      return null;
+    }
+  }
+  return null;
+}
+
+export async function restoreCurrentPlayerFromLocal(): Promise<Player | null> {
+  if (!isBrowser()) return null;
+  const playerId = window.localStorage.getItem(PLAYER_ID_KEY);
+  const phone = window.localStorage.getItem(PLAYER_PHONE_KEY);
+  if (!playerId && !phone) return null;
+
+  const available = await checkPocketBase();
+  if (available) {
+    if (playerId) {
+      try {
+        const record = await pb.collection("players").getOne(playerId);
+        if (record) {
+          const player = mapPlayerRecord(record);
+          saveCurrentPlayer(player);
+          return player;
+        }
+      } catch {
+        // 继续按 phone 查找
+      }
+    }
+    if (phone) {
+      const byPhone = await findPlayerByPhone(phone);
+      if (byPhone) {
+        saveCurrentPlayer(byPhone);
+        return byPhone;
+      }
+    }
+    // PocketBase 可用但找不到该用户，清除本地缓存
+    clearCurrentPlayer();
+    return null;
+  }
+
+  // PocketBase 不可用：使用本地缓存兜底
+  const cached = getCachedPlayer(playerId || undefined);
+  if (cached) return cached;
+  return null;
+}
+
 export function validatePhone(phone: string): boolean {
   if (!phone || phone.length !== 11) return false;
   if (phone[0] !== '1') return false;

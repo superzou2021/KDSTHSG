@@ -1,17 +1,39 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import Layout from "@/components/Layout";
 import { OFFICES, TEAMS } from "@/lib/constants";
-import { useRegisterPlayer } from "@/hooks/use-game-data";
+import { findPlayerByPhone, registerPlayer, restoreCurrentPlayerFromLocal, saveCurrentPlayer } from "@/lib/storage";
 
 export default function RegisterPage() {
   const router = useRouter();
-  const register = useRegisterPlayer();
-  const [form, setForm] = useState({ name: "Yolen", phone: "", office: "北京", team: "Alpha" });
+  const [form, setForm] = useState({ name: "", phone: "", office: "北京", team: "Alpha" });
   const [message, setMessage] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [checking, setChecking] = useState(true);
+
+  // 页面加载时检查本地登录状态
+  useEffect(() => {
+    let active = true;
+    async function check() {
+      try {
+        const player = await restoreCurrentPlayerFromLocal();
+        if (!active) return;
+        if (player) {
+          // 已注册用户，自动跳转大厅
+          router.replace("/lobby");
+          return;
+        }
+      } catch {
+        // 检查失败，继续显示注册表单
+      } finally {
+        if (active) setChecking(false);
+      }
+    }
+    check();
+    return () => { active = false; };
+  }, [router]);
 
   function updateField(field: keyof typeof form, value: string) {
     let processedValue = value;
@@ -27,12 +49,22 @@ export default function RegisterPage() {
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (isSubmitting) return;
-    
+
     setMessage("");
     setIsSubmitting(true);
-    
+
     try {
-      const result = await register(form);
+      // 先尝试按手机号查找已注册用户
+      const existingPlayer = await findPlayerByPhone(form.phone);
+      if (existingPlayer) {
+        saveCurrentPlayer(existingPlayer);
+        setMessage("欢迎回来，正在进入大厅...");
+        router.replace("/lobby");
+        return;
+      }
+
+      // 手机号不存在，正常注册
+      const result = await registerPlayer(form);
       setMessage(result.reused ? "该手机号已参与，已加载历史身份。" : "注册成功，正在进入大厅。");
       router.replace("/lobby");
       window.setTimeout(() => {
@@ -44,6 +76,18 @@ export default function RegisterPage() {
       setMessage(error instanceof Error ? error.message : "注册失败");
       setIsSubmitting(false);
     }
+  }
+
+  // 检查期间显示 loading，不要闪注册表单
+  if (checking) {
+    return (
+      <Layout title="入场登记" eyebrow="REGISTER">
+        <div style={{ textAlign: 'center', padding: '60px 0' }}>
+          <div style={{ fontSize: '48px', marginBottom: '16px' }}>⏳</div>
+          <p style={{ color: 'var(--muted)', fontSize: '16px' }}>正在检查登录状态...</p>
+        </div>
+      </Layout>
+    );
   }
 
   return (

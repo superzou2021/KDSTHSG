@@ -6,7 +6,7 @@ import { useEffect } from "react";
 import GameCard from "@/components/GameCard";
 import Layout from "@/components/Layout";
 import ScorePanel from "@/components/ScorePanel";
-import { GAME_ORDER } from "@/lib/constants";
+import { restoreCurrentPlayerFromLocal } from "@/lib/storage";
 import { useCurrentPlayer, useLobbySnapshot } from "@/hooks/use-game-data";
 
 export default function LobbyPage() {
@@ -15,7 +15,16 @@ export default function LobbyPage() {
   const { snapshot } = useLobbySnapshot(playerId);
 
   useEffect(() => {
-    if (playerId === null) router.push("/register");
+    async function check() {
+      if (playerId === null) {
+        // 尝试从本地恢复
+        const restored = await restoreCurrentPlayerFromLocal();
+        if (!restored) {
+          router.push("/register");
+        }
+      }
+    }
+    check();
   }, [playerId, router]);
 
   if (!player || !snapshot) return <Layout title="加载中">正在读取身份...</Layout>;
