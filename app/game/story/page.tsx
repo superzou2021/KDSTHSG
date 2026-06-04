@@ -59,7 +59,7 @@ export default function StoryPage() {
   if (isOpen === false) {
     return (
       <Layout title="真假故事" eyebrow="GAME 03">
-        <section className="statusBanner">该游戏已关闭，请等待现场主持人开启。</section>
+        <section className="statusBanner">游戏加载中,请耐心等待</section>
         <button className="primaryButton" type="button" onClick={() => router.push("/lobby")}>
           回到大厅
         </button>

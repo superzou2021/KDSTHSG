@@ -130,7 +130,7 @@ export default function BingoPage() {
   if (shouldLeaveClosedGame) {
     return (
       <Layout title="Bingo 猜词" eyebrow="GAME 01">
-        <section className="statusBanner">正在同步游戏开放状态...</section>
+        <section className="statusBanner">游戏加载中,请耐心等待</section>
         <button className="primaryButton" type="button" onClick={goLobby}>
           回到大厅
         </button>

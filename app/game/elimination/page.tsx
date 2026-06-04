@@ -61,7 +61,7 @@ export default function EliminationPage() {
   if (isOpen === false) {
     return (
       <Layout title="站立淘汰" eyebrow="GAME 04">
-        <section className="statusBanner">该游戏已关闭，请等待现场主持人开启。</section>
+        <section className="statusBanner">游戏加载中,请耐心等待</section>
         <button className="primaryButton" type="button" onClick={() => router.push("/lobby")}>
           回到大厅
         </button>

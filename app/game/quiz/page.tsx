@@ -171,7 +171,7 @@ export default function QuizPage() {
   if (shouldLeaveClosedGame) {
     return (
       <Layout title="Sector Quiz" eyebrow="GAME 02">
-        <section className="statusBanner">正在同步游戏开放状态...</section>
+        <section className="statusBanner">游戏加载中,请耐心等待</section>
         <button className="primaryButton" type="button" onClick={goLobby}>
           回到大厅
         </button>

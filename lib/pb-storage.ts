@@ -187,11 +187,10 @@ export async function loadStateFromPB(): Promise<AppState> {
   }
 
   try {
-    // 使用 $autoCancel: false 确保状态加载不会被其他请求中断
     const [players, gameResults, games] = await Promise.all([
-      pb.collection("players").getFullList({ $autoCancel: false }),
-      pb.collection("game_results").getFullList({ sort: "completedAt", $autoCancel: false }),
-      pb.collection("games").getFullList({ sort: "order", $autoCancel: false })
+      pb.collection("players").getFullList(),
+      pb.collection("game_results").getFullList({ sort: "completedAt" }),
+      pb.collection("games").getFullList({ sort: "order" })
     ]);
 
     const mappedPlayers: Player[] = players.map(mapPlayerRecord);
@@ -383,7 +382,7 @@ export async function toggleGameOpen(gameKey: GameKey): Promise<AppState> {
 
   const available = await checkPocketBase();
   if (available) {
-    const list = await pb.collection("games").getFullList({ $autoCancel: false });
+    const list = await pb.collection("games").getFullList();
     for (const game of newGames) {
       const existing = list.find(g => g.key === game.key);
       if (existing) {
@@ -394,7 +393,7 @@ export async function toggleGameOpen(gameKey: GameKey): Promise<AppState> {
         if (game.key === "quiz") {
           data.quizCurrentGroup = game.quizCurrentGroup || 0;
         }
-        await pb.collection("games").update(existing.id, data, { $autoCancel: false });
+        await pb.collection("games").update(existing.id, data);
       }
     }
   }
@@ -456,10 +455,8 @@ export async function triggerBingoScore(): Promise<AppState> {
     console.log("🔌 PocketBase 可用，开始同步数据...");
     
     try {
-      // 使用 $autoCancel: false 禁用自动取消，防止请求被轮询中断
       const pendingResults = await pb.collection("game_results").getFullList({ 
-        filter: "gameKey = 'bingo'",
-        $autoCancel: false 
+        filter: "gameKey = 'bingo'"
       });
       console.log(`📝 找到 ${pendingResults.length} 条 BINGO 结果`);
       
@@ -469,7 +466,7 @@ export async function triggerBingoScore(): Promise<AppState> {
           await pb.collection("game_results").update(result.id, {
             pendingBingoScore: false,
             answers: { ...result.answers, pendingBingoScore: false }
-          }, { $autoCancel: false });
+          });
         }
       }
 
@@ -478,14 +475,14 @@ export async function triggerBingoScore(): Promise<AppState> {
           totalScore: player.totalScore,
           completedGames: player.completedGames
         });
-        await pb.collection("players").update(player.id, buildPlayerUpdate(player), { $autoCancel: false });
+        await pb.collection("players").update(player.id, buildPlayerUpdate(player));
       }
 
-      const list = await pb.collection("games").getFullList({ $autoCancel: false });
+      const list = await pb.collection("games").getFullList();
       const bingo = list.find(g => g.key === "bingo");
       if (bingo) {
         console.log(`✓ 更新 BINGO 游戏状态：isOpen=false, bingoScored=true`);
-        await pb.collection("games").update(bingo.id, { isOpen: false, bingoScored: true }, { $autoCancel: false });
+        await pb.collection("games").update(bingo.id, { isOpen: false, bingoScored: true });
       }
 
       console.log("✅ PocketBase 数据同步完成");
@@ -521,11 +518,11 @@ export async function advanceQuizGroup(): Promise<AppState> {
 
   const available = await checkPocketBase();
   if (available) {
-    const list = await pb.collection("games").getFullList({ $autoCancel: false });
+    const list = await pb.collection("games").getFullList();
     const quiz = list.find(g => g.key === "quiz");
     if (quiz) {
       const nextGroup = (quiz.quizCurrentGroup || 0) + 1;
-      await pb.collection("games").update(quiz.id, { quizCurrentGroup: nextGroup }, { $autoCancel: false });
+      await pb.collection("games").update(quiz.id, { quizCurrentGroup: nextGroup });
     }
   }
 
@@ -575,7 +572,7 @@ export async function submitGameResult(input: {
       maxScore: result.maxScore,
       completedAt: result.completedAt,
       pendingBingoScore: Boolean(input.pendingBingoScore)
-    }, { $autoCancel: false });
+    });
     result.id = created.id;
   }
 
@@ -604,7 +601,7 @@ export async function submitGameResult(input: {
   };
 
   if (available) {
-    await pb.collection("players").update(player.id, buildPlayerUpdate(player), { $autoCancel: false });
+    await pb.collection("players").update(player.id, buildPlayerUpdate(player));
   }
 
   const newState: AppState = {
