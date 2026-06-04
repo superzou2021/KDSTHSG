@@ -86,10 +86,6 @@ export default function ResultPage() {
         <h2>各地区 TOP3</h2>
         <OfficeTop3Panel data={ranking.officeTop3} />
       </section>
-
-      <div className="pageActions">
-        <Link className="primaryButton" href="/lobby">返回大厅</Link>
-      </div>
     </Layout>
   );
 }

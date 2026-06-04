@@ -50,9 +50,21 @@ export default function LobbyPage() {
       <ScorePanel roundScore={roundScore} totalScore={player.totalScore} rank={snapshot.rank} />
       <div className="progressLine"><span style={{ width: `${(completedCount / 4) * 100}%` }} /></div>
       <section className="gameList">
-        {snapshot.state.games.sort((a, b) => a.order - b.order).map((game) => (
-          <GameCard game={game} completed={player.completedGames.includes(game.key)} key={game.key} />
-        ))}
+        {snapshot.state.games.sort((a, b) => a.order - b.order).map((game) => {
+          const isBingo = game.key === "bingo";
+          const userBingoResult = isBingo
+            ? snapshot.results.find((r) => r.gameKey === "bingo")
+            : undefined;
+          const bingoPending = Boolean(userBingoResult?.pendingBingoScore);
+          return (
+            <GameCard
+              game={game}
+              completed={player.completedGames.includes(game.key)}
+              bingoPending={bingoPending}
+              key={game.key}
+            />
+          );
+        })}
       </section>
     </Layout>
   );

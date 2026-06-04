@@ -82,16 +82,18 @@ export default function QuizPage() {
   }, [playerId]);
 
   // 监听后台的板块更新
+  // 关键修复：后台 currentGroup 只代表"允许答题的最大组"，不强制用户跳转
+  // 用户始终按自己的节奏从第 1 组开始答题
+  // 当用户在等待时，如果后台开放了下一组（currentGroup >= localGroupIndex），则解除等待
   useEffect(() => {
     if (!hasStarted) return;
-    // 当后台更新了板块且本地还没到那个板块时，更新本地并重置等待状态
-    if (currentGroup > localGroupIndex) {
-      setLocalGroupIndex(currentGroup);
-      setQuestionIndexInGroup(0);
+    if (waitingForNextGroup && currentGroup >= localGroupIndex) {
+      // 后台已经开放到用户当前等待的这一组，解除等待
       setWaitingForNextGroup(false);
       setSeconds(GROUP_SECONDS);
+      setMessage("");
     }
-  }, [currentGroup, localGroupIndex, hasStarted]);
+  }, [currentGroup, localGroupIndex, hasStarted, waitingForNextGroup]);
 
   // 倒计时逻辑
   useEffect(() => {
@@ -106,12 +108,26 @@ export default function QuizPage() {
     
     if (isLastGroup && isGroupComplete) {
       submitAllAnswers();
+    } else if (isGroupComplete) {
+      // 本组答完，进入下一组（或等待后台开放）
+      const nextGroup = localGroupIndex + 1;
+      setLocalGroupIndex(nextGroup);
+      setQuestionIndexInGroup(0);
+      if (currentGroup >= nextGroup) {
+        // 后台已经开放到下一组，直接继续
+        setSeconds(GROUP_SECONDS);
+        setMessage("");
+      } else {
+        // 后台还没开放，进入等待
+        setWaitingForNextGroup(true);
+        setMessage("等待后台开启下一板块...");
+      }
     } else {
-      // 进入等待状态
+      // 时间到但本组未答完，进入等待
       setWaitingForNextGroup(true);
       setMessage("等待后台开启下一板块...");
     }
-  }, [seconds, hasStarted, waitingForNextGroup, modal.open, existing, quizIsOpen, isLastGroup, isGroupComplete]);
+  }, [seconds, hasStarted, waitingForNextGroup, modal.open, existing, quizIsOpen, isLastGroup, isGroupComplete, localGroupIndex, currentGroup]);
 
   const shouldLeaveClosedGame = isOpen === false && !quizGame?.isOpen && !existingLoading && !existing && !modal.open;
 
@@ -140,8 +156,19 @@ export default function QuizPage() {
       if (isLastGroup) {
         submitAllAnswers();
       } else {
-        setWaitingForNextGroup(true);
-        setMessage("等待后台开启下一板块...");
+        // 本组答完，推进到下一组
+        const nextGroup = localGroupIndex + 1;
+        setLocalGroupIndex(nextGroup);
+        setQuestionIndexInGroup(0);
+        if (currentGroup >= nextGroup) {
+          // 后台已经开放到下一组，直接继续答题
+          setSeconds(GROUP_SECONDS);
+          setMessage("");
+        } else {
+          // 后台还没开放，进入等待
+          setWaitingForNextGroup(true);
+          setMessage("等待后台开启下一板块...");
+        }
       }
     } else {
       setQuestionIndexInGroup((prev) => prev + 1);

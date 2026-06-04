@@ -1217,8 +1217,8 @@ button:disabled {
   min-height: 100vh;
   padding: 28px;
   background:
-    radial-gradient(ellipse at 20% 10%, rgba(0, 203, 130, 0.18), transparent 42%),
-    #010203;
+    radial-gradient(ellipse at 50% 25%, rgba(64, 216, 138, 0.2), transparent 55%),
+    #063125;
 }
 
 .screenHeader {

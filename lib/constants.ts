@@ -11,7 +11,7 @@ export const TEAMS = ["Alpha", "Beta", "Gamma", "Delta"];
 export const GAME_ORDER: GameKey[] = ["bingo", "quiz", "story", "elimination"];
 
 export const GAMES: Game[] = [
-  { id: "game-bingo", key: "bingo", name: "Bingo 猜词", maxScore: 100, isOpen: false, order: 1, bingoScored: false },
+  { id: "game-bingo", key: "bingo", name: "Bingo 猜词", maxScore: 100, isOpen: false, order: 1, bingoScored: false, bingoPhase: "open" },
   { id: "game-quiz", key: "quiz", name: "Sector Quiz", maxScore: 100, isOpen: false, order: 2, quizCurrentGroup: 0 },
   { id: "game-story", key: "story", name: "真假故事", maxScore: 100, isOpen: false, order: 3 },
   { id: "game-elimination", key: "elimination", name: "站立淘汰", maxScore: 100, isOpen: false, order: 4 }

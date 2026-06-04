@@ -269,7 +269,10 @@ export async function toggleGameOpen(gameKey: GameKey): Promise<AppState> {
     if (game.key !== gameKey) return game;
     const isOpen = !game.isOpen;
     if (game.key === "bingo") {
-      return { ...game, isOpen, bingoScored: isOpen ? false : game.bingoScored };
+      if (isOpen) {
+        return { ...game, isOpen, bingoScored: false, bingoPhase: "open" as const };
+      }
+      return { ...game, isOpen };
     }
     if (game.key === "quiz" && isOpen) {
       return { ...game, isOpen, quizCurrentGroup: 0 };
@@ -286,7 +289,26 @@ export async function triggerBingoScore(): Promise<AppState> {
     return await pbStorage.triggerBingoScore();
   }
   const state = settlePendingBingoResults(loadStateLocal());
-  state.games = state.games.map((game) => (game.key === "bingo" ? { ...game, isOpen: false, bingoScored: true } : game));
+  state.games = state.games.map((game) => (
+    game.key === "bingo" 
+      ? { ...game, isOpen: false, bingoScored: true, bingoPhase: "auto_score" as const } 
+      : game
+  ));
+  saveStateLocal(state);
+  return state;
+}
+
+export async function closeBingoGame(): Promise<AppState> {
+  const available = await checkBackend();
+  if (available) {
+    return await pbStorage.closeBingoGame();
+  }
+  const state = loadStateLocal();
+  state.games = state.games.map((game) => (
+    game.key === "bingo"
+      ? { ...game, isOpen: false, bingoPhase: "closed" as const }
+      : game
+  ));
   saveStateLocal(state);
   return state;
 }
@@ -319,15 +341,39 @@ export async function submitGameResult(input: {
   }
 
   const state = loadStateLocal();
-  if (!state.games.find((game) => game.key === input.gameKey)?.isOpen) {
-    throw new Error("该游戏暂未开放");
-  }
-  if (state.gameResults.some((result) => result.player === input.playerId && result.gameKey === input.gameKey)) {
-    throw new Error("该游戏已完成，不能重复提交");
-  }
-
+  const game = state.games.find((g) => g.key === input.gameKey);
   const playerIndex = state.players.findIndex((player) => player.id === input.playerId);
   if (playerIndex < 0) throw new Error("未找到当前用户，请重新注册");
+  const playerObj = state.players[playerIndex];
+
+  // === Bingo 特殊逻辑：根据 bingoPhase 决定提交行为 ===
+  let isPending = false;
+  if (input.gameKey === "bingo") {
+    const bingoPhase = game?.bingoPhase || "open";
+    if (playerObj.completedGames.includes("bingo")) {
+      throw new Error("该游戏已完成，不能重复提交");
+    }
+    const existingBingo = state.gameResults.find(
+      (r) => r.player === input.playerId && r.gameKey === "bingo"
+    );
+    if (existingBingo && !existingBingo.pendingBingoScore) {
+      throw new Error("该游戏已完成，不能重复提交");
+    }
+    if (existingBingo && existingBingo.pendingBingoScore) {
+      throw new Error("已提交，等待 Boss 发言完成后判分");
+    }
+    if (bingoPhase === "closed") {
+      throw new Error("Bingo 已结束");
+    }
+    isPending = bingoPhase === "open";
+  } else {
+    if (!game?.isOpen) {
+      throw new Error("该游戏暂未开放");
+    }
+    if (state.gameResults.some((result) => result.player === input.playerId && result.gameKey === input.gameKey)) {
+      throw new Error("该游戏已完成，不能重复提交");
+    }
+  }
 
   const result: GameResult = {
     id: createId("result"),
@@ -337,27 +383,27 @@ export async function submitGameResult(input: {
     score: Math.max(0, Math.min(100, Math.round(input.score))),
     maxScore: 100,
     completedAt: nowIso(),
-    pendingBingoScore: input.pendingBingoScore
+    pendingBingoScore: isPending
   };
 
-  if (input.pendingBingoScore) {
+  if (isPending) {
     state.gameResults = [...state.gameResults, result];
     saveStateLocal(state);
-    return { result, player: state.players[playerIndex], rank: getPlayerRank(state.players, input.playerId) };
+    return { result, player: playerObj, rank: getPlayerRank(state.players, input.playerId) };
   }
 
   const gameResults = [...state.gameResults, result];
   const totalScore = gameResults
-    .filter((item) => item.player === input.playerId)
+    .filter((item) => item.player === input.playerId && !item.pendingBingoScore)
     .reduce((sum, item) => sum + item.score, 0);
-  const completedGames = [...new Set([...state.players[playerIndex].completedGames, input.gameKey])] as GameKey[];
+  const completedGames = [...new Set([...playerObj.completedGames, input.gameKey])] as GameKey[];
   const finalSubmitted = GAME_ORDER.every((key) => completedGames.includes(key));
   const player: Player = {
-    ...state.players[playerIndex],
+    ...playerObj,
     totalScore,
     completedGames,
     finalSubmitted,
-    finalCompletedAt: finalSubmitted ? nowIso() : state.players[playerIndex].finalCompletedAt,
+    finalCompletedAt: finalSubmitted ? nowIso() : playerObj.finalCompletedAt,
     updated: nowIso()
   };
 

@@ -14,6 +14,8 @@ export type Player = {
   finalCompletedAt?: string;
 };
 
+export type BingoPhase = "open" | "auto_score" | "closed";
+
 export type Game = {
   id: string;
   key: GameKey;
@@ -22,6 +24,7 @@ export type Game = {
   isOpen: boolean;
   order: number;
   bingoScored?: boolean;
+  bingoPhase?: BingoPhase;
   quizCurrentGroup?: number;
 };
 

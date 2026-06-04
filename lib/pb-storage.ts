@@ -55,6 +55,11 @@ function mapPlayerRecord(record: any): Player {
 }
 
 function mapGameRecord(record: any): Game {
+  // 兼容旧数据：没有 bingoPhase 字段时，根据 bingoScored 推断
+  let bingoPhase = record.bingoPhase;
+  if (record.key === "bingo" && !bingoPhase) {
+    bingoPhase = record.bingoScored ? "auto_score" : "open";
+  }
   return {
     id: record.id,
     key: record.key,
@@ -63,6 +68,7 @@ function mapGameRecord(record: any): Game {
     isOpen: Boolean(record.isOpen),
     order: record.order,
     bingoScored: Boolean(record.bingoScored),
+    bingoPhase,
     quizCurrentGroup: record.quizCurrentGroup || 0
   };
 }
@@ -119,6 +125,10 @@ export async function ensureGameState(): Promise<void> {
           if (game.key === "bingo") {
             if (existingGame.bingoScored === undefined) {
               updateData.bingoScored = false;
+              shouldUpdate = true;
+            }
+            if (existingGame.bingoPhase === undefined) {
+              updateData.bingoPhase = existingGame.bingoScored ? "auto_score" : "open";
               shouldUpdate = true;
             }
           }
@@ -442,7 +452,12 @@ export async function toggleGameOpen(gameKey: GameKey): Promise<AppState> {
     if (game.key !== gameKey) return game;
     const isOpen = !game.isOpen;
     if (game.key === "bingo") {
-      return { ...game, isOpen, bingoScored: isOpen ? false : game.bingoScored };
+      // 开启 Bingo 时：恢复到 open 阶段，清除已判分标记
+      // 关闭 Bingo 时：保留当前 bingoPhase（由专门的"完全关闭"按钮设置 closed）
+      if (isOpen) {
+        return { ...game, isOpen, bingoScored: false, bingoPhase: "open" as const };
+      }
+      return { ...game, isOpen };
     }
     if (game.key === "quiz" && isOpen) {
       return { ...game, isOpen, quizCurrentGroup: 0 };
@@ -460,6 +475,7 @@ export async function toggleGameOpen(gameKey: GameKey): Promise<AppState> {
         let data: Record<string, any> = { isOpen: game.isOpen };
         if (game.key === "bingo") {
           data.bingoScored = Boolean(game.bingoScored);
+          if (game.bingoPhase) data.bingoPhase = game.bingoPhase;
         }
         if (game.key === "quiz") {
           data.quizCurrentGroup = game.quizCurrentGroup || 0;
@@ -474,7 +490,7 @@ export async function toggleGameOpen(gameKey: GameKey): Promise<AppState> {
 }
 
 export async function triggerBingoScore(): Promise<AppState> {
-  console.log("🎮 triggerBingoScore: 开始执行");
+  console.log("🎮 completeBossAndEnableAutoScore: 开始执行");
   
   let state = await loadState();
   console.log("📊 加载的当前状态：", {
@@ -483,7 +499,7 @@ export async function triggerBingoScore(): Promise<AppState> {
     bingoPendingCount: state.gameResults.filter(r => r.gameKey === "bingo" && r.pendingBingoScore).length
   });
   
-  // 手动处理 BINGO 判分，将 bingo 加入玩家的 completedGames
+  // 1. 找到所有 pendingBingoScore=true 的 Bingo 记录并判分
   const gameResults = state.gameResults.map((result) => {
     if (result.gameKey !== "bingo" || !result.pendingBingoScore) return result;
     return {
@@ -493,20 +509,12 @@ export async function triggerBingoScore(): Promise<AppState> {
     };
   });
 
-  console.log("✅ 处理后的 gameResults");
-
+  // 2. 重新计算所有玩家的 completedGames 和 totalScore
   const players = state.players.map((player) => {
     const playerResults = gameResults.filter((result) => result.player === player.id && !result.pendingBingoScore);
     const completedGames = [...new Set(playerResults.map((result) => result.gameKey))] as GameKey[];
     const finalSubmitted = GAME_ORDER.every((key) => completedGames.includes(key));
     const totalScore = playerResults.reduce((sum, result) => sum + result.score, 0);
-
-    console.log(`👤 处理玩家 ${player.name}：`, {
-      beforeCompletedGames: player.completedGames,
-      afterCompletedGames: completedGames,
-      beforeTotalScore: player.totalScore,
-      afterTotalScore: totalScore
-    });
 
     return {
       ...player,
@@ -518,7 +526,13 @@ export async function triggerBingoScore(): Promise<AppState> {
     };
   });
 
-  const newGames = state.games.map((game) => (game.key === "bingo" ? { ...game, isOpen: false, bingoScored: true } : game));
+  // 3. 更新 Bingo 状态：bingoPhase=auto_score, isOpen=false
+  // 注意：isOpen=false 不阻止未完成用户进入，由 bingoPhase 决定
+  const newGames = state.games.map((game) => (
+    game.key === "bingo" 
+      ? { ...game, isOpen: false, bingoScored: true, bingoPhase: "auto_score" as const } 
+      : game
+  ));
   const newState = { ...state, players, gameResults, games: newGames };
 
   const available = await checkPocketBase();
@@ -529,11 +543,9 @@ export async function triggerBingoScore(): Promise<AppState> {
       const pendingResults = await pb.collection("game_results").getFullList({ 
         filter: "gameKey = 'bingo'"
       });
-      console.log(`📝 找到 ${pendingResults.length} 条 BINGO 结果`);
       
       for (const result of pendingResults) {
         if (mapPendingBingoScore(result)) {
-          console.log(`✓ 更新 game_result ${result.id}: pendingBingoScore=false`);
           await pb.collection("game_results").update(result.id, {
             pendingBingoScore: false,
             answers: { ...result.answers, pendingBingoScore: false }
@@ -542,18 +554,17 @@ export async function triggerBingoScore(): Promise<AppState> {
       }
 
       for (const player of newState.players) {
-        console.log(`✓ 更新玩家 ${player.name}:`, {
-          totalScore: player.totalScore,
-          completedGames: player.completedGames
-        });
         await pb.collection("players").update(player.id, buildPlayerUpdate(player));
       }
 
       const list = await pb.collection("games").getFullList();
       const bingo = list.find(g => g.key === "bingo");
       if (bingo) {
-        console.log(`✓ 更新 BINGO 游戏状态：isOpen=false, bingoScored=true`);
-        await pb.collection("games").update(bingo.id, { isOpen: false, bingoScored: true });
+        await pb.collection("games").update(bingo.id, { 
+          isOpen: false, 
+          bingoScored: true,
+          bingoPhase: "auto_score"
+        });
       }
 
       console.log("✅ PocketBase 数据同步完成");
@@ -564,18 +575,38 @@ export async function triggerBingoScore(): Promise<AppState> {
   }
 
   await saveState(newState);
-  
-  // 强制重新加载状态，确保获取最新数据
   const finalState = available ? await loadStateFromPB() : newState;
-  
-  console.log("🎯 triggerBingoScore: 执行完成");
-  console.log("📊 最终状态验证：");
-  console.log(`  游戏状态: bingo.isOpen=${finalState.games.find(g => g.key === 'bingo')?.isOpen}, bingo.bingoScored=${finalState.games.find(g => g.key === 'bingo')?.bingoScored}`);
-  finalState.players.forEach(p => {
-    console.log(`  👤 ${p.name}: completedGames=${JSON.stringify(p.completedGames)}, totalScore=${p.totalScore}`);
-  });
-  
+  console.log("🎯 completeBossAndEnableAutoScore: 执行完成");
   return finalState;
+}
+
+// 别名，语义更清晰
+export const completeBossAndEnableAutoScore = triggerBingoScore;
+
+// 完全关闭 Bingo（管理员决定终止 Bingo）
+export async function closeBingoGame(): Promise<AppState> {
+  const state = await loadState();
+  const newGames = state.games.map((game) => (
+    game.key === "bingo"
+      ? { ...game, isOpen: false, bingoPhase: "closed" as const }
+      : game
+  ));
+  const newState = { ...state, games: newGames };
+
+  const available = await checkPocketBase();
+  if (available) {
+    const list = await pb.collection("games").getFullList();
+    const bingo = list.find(g => g.key === "bingo");
+    if (bingo) {
+      await pb.collection("games").update(bingo.id, {
+        isOpen: false,
+        bingoPhase: "closed"
+      });
+    }
+  }
+
+  await saveState(newState);
+  return available ? await loadStateFromPB() : newState;
 }
 
 export async function advanceQuizGroup(): Promise<AppState> {
@@ -610,7 +641,42 @@ export async function submitGameResult(input: {
 }): Promise<{ result: GameResult; player: Player; rank: number }> {
   const state = await loadState();
   const game = state.games.find((g) => g.key === input.gameKey);
+  const player = state.players.find((p) => p.id === input.playerId);
 
+  if (!player) throw new Error("未找到当前用户，请重新注册");
+
+  // === Bingo 特殊逻辑：根据 bingoPhase 决定提交行为 ===
+  if (input.gameKey === "bingo") {
+    const bingoPhase = game?.bingoPhase || "open";
+
+    // 1. 已完成则禁止重复提交
+    if (player.completedGames.includes("bingo")) {
+      throw new Error("该游戏已完成，不能重复提交");
+    }
+    // 已有非 pending 的 bingo 记录也算完成
+    const existingBingoResult = state.gameResults.find(
+      (r) => r.player === input.playerId && r.gameKey === "bingo"
+    );
+    if (existingBingoResult && !existingBingoResult.pendingBingoScore) {
+      throw new Error("该游戏已完成，不能重复提交");
+    }
+    // 已存在 pending 记录不允许重复提交
+    if (existingBingoResult && existingBingoResult.pendingBingoScore) {
+      throw new Error("已提交，等待 Boss 发言完成后判分");
+    }
+
+    // 2. closed 阶段禁止提交
+    if (bingoPhase === "closed") {
+      throw new Error("Bingo 已结束");
+    }
+
+    // 3. open 阶段：标记 pending，等待 Boss 判分
+    // 4. auto_score 阶段：立即判分
+    const isPending = bingoPhase === "open";
+    return await persistGameResult(state, input, isPending);
+  }
+
+  // === 其他游戏：必须 isOpen=true ===
   if (!game?.isOpen) {
     throw new Error("该游戏暂未开放");
   }
@@ -619,6 +685,20 @@ export async function submitGameResult(input: {
     throw new Error("该游戏已完成，不能重复提交");
   }
 
+  return await persistGameResult(state, input, false);
+}
+
+async function persistGameResult(
+  state: AppState,
+  input: {
+    playerId: string;
+    gameKey: GameKey;
+    answers: Record<string, unknown>;
+    score: number;
+    pendingBingoScore?: boolean;
+  },
+  isPending: boolean
+): Promise<{ result: GameResult; player: Player; rank: number }> {
   const playerIndex = state.players.findIndex((player) => player.id === input.playerId);
   if (playerIndex < 0) throw new Error("未找到当前用户，请重新注册");
 
@@ -630,7 +710,7 @@ export async function submitGameResult(input: {
     score: Math.max(0, Math.min(100, Math.round(input.score))),
     maxScore: 100,
     completedAt: nowIso(),
-    pendingBingoScore: input.pendingBingoScore
+    pendingBingoScore: isPending
   };
 
   const available = await checkPocketBase();
@@ -642,12 +722,13 @@ export async function submitGameResult(input: {
       score: result.score,
       maxScore: result.maxScore,
       completedAt: result.completedAt,
-      pendingBingoScore: Boolean(input.pendingBingoScore)
+      pendingBingoScore: isPending
     });
     result.id = created.id;
   }
 
-  if (input.pendingBingoScore) {
+  // pending 情况下不更新 player.completedGames
+  if (isPending) {
     const newState: AppState = {
       ...state,
       gameResults: [...state.gameResults, result]
@@ -656,9 +737,10 @@ export async function submitGameResult(input: {
     return { result, player: state.players[playerIndex], rank: getPlayerRank(state.players, input.playerId) };
   }
 
+  // 已判分：更新 player
   const gameResults = [...state.gameResults, result];
   const totalScore = gameResults
-    .filter((item) => item.player === input.playerId)
+    .filter((item) => item.player === input.playerId && !item.pendingBingoScore)
     .reduce((sum, item) => sum + item.score, 0);
   const completedGames = [...new Set([...state.players[playerIndex].completedGames, input.gameKey])] as GameKey[];
   const finalSubmitted = GAME_ORDER.every((key) => completedGames.includes(key));
