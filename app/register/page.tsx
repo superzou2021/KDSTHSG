@@ -18,7 +18,10 @@ export default function RegisterPage() {
     let active = true;
     async function check() {
       try {
-        const player = await restoreCurrentPlayerFromLocal();
+        const player = await Promise.race([
+          restoreCurrentPlayerFromLocal(),
+          new Promise<null>((resolve) => setTimeout(() => resolve(null), 5000))
+        ]);
         if (!active) return;
         if (player) {
           // 已注册用户，自动跳转大厅
