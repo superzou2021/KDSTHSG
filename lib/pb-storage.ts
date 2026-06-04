@@ -4,7 +4,7 @@ import { pb } from "@/lib/pocketbase";
 import { GAME_ORDER, GAMES, PLAYER_CACHE_KEY, PLAYER_ID_KEY, PLAYER_PHONE_KEY, QUESTIONS, SEED_PLAYERS } from "@/lib/constants";
 import { settlePendingBingoResults } from "@/lib/game-state";
 import { getOfficeAverageRanking, getOfficeTop3, getPlayerRank, getPlayerRankingContext, getTop10Ranking } from "@/lib/ranking";
-import type { AppState, Game, GameKey, GameResult, Player } from "@/types";
+import type { AppState, Game, GameKey, GameResult, Player, Question, QuizProgress, QuizSessionSnapshot } from "@/types";
 
 let pocketBaseAvailable = false;
 
@@ -14,6 +14,95 @@ function nowIso(): string {
 
 function createId(prefix: string): string {
   return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
+function getQuizSessionIndexFromOrder(order: number): number {
+  return Math.max(0, Math.min(4, Math.floor((Math.max(1, order) - 1) / 2)));
+}
+
+function getQuizSectorDefaults(index: number): { sectorKey: string; sectorName: string } {
+  return {
+    sectorKey: `sector-${index + 1}`,
+    sectorName: `Sector ${index + 1}`
+  };
+}
+
+function normalizeQuizOpenGroups(value: unknown): number[] {
+  if (!Array.isArray(value)) return [];
+  return [...new Set(value
+    .map((item) => Number(item))
+    .filter((item) => Number.isInteger(item) && item >= 0 && item <= 4))]
+    .sort((a, b) => a - b);
+}
+
+function normalizeQuestion(question: Question): Question {
+  if (question.gameKey !== "quiz") return question;
+  const derivedSessionIndex = getQuizSessionIndexFromOrder(question.order);
+  const hasExplicitSector = Boolean(question.sectorKey || question.sectorName);
+  const quizSessionIndex = Number.isInteger(question.quizSessionIndex) && (hasExplicitSector || question.quizSessionIndex !== 0 || derivedSessionIndex === 0)
+    ? question.quizSessionIndex as number
+    : derivedSessionIndex;
+  const defaults = getQuizSectorDefaults(quizSessionIndex);
+  return {
+    ...question,
+    quizSessionIndex,
+    sectorKey: question.sectorKey || defaults.sectorKey,
+    sectorName: question.sectorName || defaults.sectorName
+  };
+}
+
+function normalizeGameResult(result: GameResult): GameResult {
+  if (result.gameKey !== "quiz") return result;
+  const quizSessionIndex = Number.isInteger(result.quizSessionIndex) ? result.quizSessionIndex : undefined;
+  if (quizSessionIndex === undefined) return result;
+  const defaults = getQuizSectorDefaults(quizSessionIndex);
+  return {
+    ...result,
+    sectorKey: result.sectorKey || defaults.sectorKey,
+    sectorName: result.sectorName || defaults.sectorName
+  };
+}
+
+function getCompletedGamesForPlayer(player: Player, playerResults: GameResult[], nextGameKey: GameKey): GameKey[] {
+  const completedGames = new Set<GameKey>(player.completedGames.filter((key) => key !== "quiz"));
+  for (const result of playerResults) {
+    if (result.pendingBingoScore) continue;
+    if (result.gameKey !== "quiz") completedGames.add(result.gameKey);
+  }
+
+  const completedQuizGroups = new Set(
+    playerResults
+      .filter((result) => result.gameKey === "quiz" && !result.pendingBingoScore)
+      .map((result) => result.quizSessionIndex)
+      .filter((index): index is number => Number.isInteger(index))
+  );
+  if (completedQuizGroups.size >= 5 || (nextGameKey === "quiz" && completedQuizGroups.size >= 5)) {
+    completedGames.add("quiz");
+  }
+  return GAME_ORDER.filter((key) => completedGames.has(key));
+}
+
+function buildQuizProgress(state: AppState, playerId: string): QuizProgress {
+  const quizGame = state.games.find((game) => game.key === "quiz");
+  const openGroups = normalizeQuizOpenGroups(quizGame?.quizOpenGroups || []);
+  const quizResults = state.gameResults
+    .filter((result) => result.player === playerId && result.gameKey === "quiz" && !result.pendingBingoScore)
+    .map(normalizeGameResult);
+  const completedGroups = normalizeQuizOpenGroups(quizResults
+    .map((result) => result.quizSessionIndex)
+    .filter((index): index is number => Number.isInteger(index)));
+  const completedSet = new Set(completedGroups);
+  const availableGroups = openGroups.filter((group) => !completedSet.has(group));
+
+  return {
+    completedCount: completedGroups.length,
+    totalCount: 5,
+    score: quizResults.reduce((sum, result) => sum + result.score, 0),
+    maxScore: 100,
+    openGroups,
+    availableGroups,
+    completedGroups
+  };
 }
 
 function isBrowser(): boolean {
@@ -69,8 +158,36 @@ function mapGameRecord(record: any): Game {
     order: record.order,
     bingoScored: Boolean(record.bingoScored),
     bingoPhase,
-    quizCurrentGroup: record.quizCurrentGroup || 0
+    quizCurrentGroup: record.quizCurrentGroup || 0,
+    quizOpenGroups: normalizeQuizOpenGroups(record.quizOpenGroups)
   };
+}
+
+function mapQuestionRecord(record: any): Question {
+  return normalizeQuestion({
+    id: record.id,
+    gameKey: record.gameKey,
+    type: record.type,
+    title: record.title,
+    options: record.options || undefined,
+    correctAnswer: record.correctAnswer,
+    score: record.score || 0,
+    order: record.order || 1,
+    isActive: record.isActive !== false,
+    sectorKey: record.sectorKey || undefined,
+    sectorName: record.sectorName || undefined,
+    quizSessionIndex: record.quizSessionIndex
+  });
+}
+
+async function loadQuestionsFromPB(): Promise<Question[]> {
+  try {
+    const records = await pb.collection("questions").getFullList({ sort: "order" });
+    if (records.length === 0) return QUESTIONS.map(normalizeQuestion);
+    return records.map(mapQuestionRecord);
+  } catch {
+    return QUESTIONS.map(normalizeQuestion);
+  }
 }
 
 function mapPendingBingoScore(record: any): boolean {
@@ -137,6 +254,10 @@ export async function ensureGameState(): Promise<void> {
               updateData.quizCurrentGroup = 0;
               shouldUpdate = true;
             }
+            if (existingGame.quizOpenGroups === undefined) {
+              updateData.quizOpenGroups = [];
+              shouldUpdate = true;
+            }
           }
           
           if (shouldUpdate) {
@@ -197,10 +318,11 @@ export async function loadStateFromPB(): Promise<AppState> {
   }
 
   try {
-    const [players, gameResults, games] = await Promise.all([
+    const [players, gameResults, games, questions] = await Promise.all([
       pb.collection("players").getFullList(),
       pb.collection("game_results").getFullList({ sort: "completedAt" }),
-      pb.collection("games").getFullList({ sort: "order" })
+      pb.collection("games").getFullList({ sort: "order" }),
+      loadQuestionsFromPB()
     ]);
 
     const mappedPlayers: Player[] = players.map(mapPlayerRecord);
@@ -213,15 +335,18 @@ export async function loadStateFromPB(): Promise<AppState> {
       score: r.score,
       maxScore: r.maxScore,
       completedAt: r.completedAt,
-      pendingBingoScore: mapPendingBingoScore(r)
-    }));
+      pendingBingoScore: mapPendingBingoScore(r),
+      quizSessionIndex: r.quizSessionIndex,
+      sectorKey: r.sectorKey || undefined,
+      sectorName: r.sectorName || undefined
+    })).map(normalizeGameResult);
     const mappedGames: Game[] = games.map(mapGameRecord);
 
     return {
       players: mappedPlayers,
       gameResults: mappedResults,
       games: mappedGames.length > 0 ? mappedGames : GAMES,
-      questions: QUESTIONS
+      questions
     };
   } catch (error) {
     console.error("❌ loadStateFromPB 失败:", error);
@@ -234,7 +359,7 @@ export function getInitialState(): AppState {
     players: SEED_PLAYERS,
     gameResults: [],
     games: GAMES,
-    questions: QUESTIONS
+    questions: QUESTIONS.map(normalizeQuestion)
   };
 }
 
@@ -459,9 +584,6 @@ export async function toggleGameOpen(gameKey: GameKey): Promise<AppState> {
       }
       return { ...game, isOpen };
     }
-    if (game.key === "quiz" && isOpen) {
-      return { ...game, isOpen, quizCurrentGroup: 0 };
-    }
     return { ...game, isOpen };
   });
   const newState = { ...state, games: newGames };
@@ -479,6 +601,7 @@ export async function toggleGameOpen(gameKey: GameKey): Promise<AppState> {
         }
         if (game.key === "quiz") {
           data.quizCurrentGroup = game.quizCurrentGroup || 0;
+          data.quizOpenGroups = game.quizOpenGroups || [];
         }
         await pb.collection("games").update(existing.id, data);
       }
@@ -512,7 +635,7 @@ export async function triggerBingoScore(): Promise<AppState> {
   // 2. 重新计算所有玩家的 completedGames 和 totalScore
   const players = state.players.map((player) => {
     const playerResults = gameResults.filter((result) => result.player === player.id && !result.pendingBingoScore);
-    const completedGames = [...new Set(playerResults.map((result) => result.gameKey))] as GameKey[];
+    const completedGames = getCompletedGamesForPlayer(player, playerResults, "bingo");
     const finalSubmitted = GAME_ORDER.every((key) => completedGames.includes(key));
     const totalScore = playerResults.reduce((sum, result) => sum + result.score, 0);
 
@@ -614,7 +737,9 @@ export async function advanceQuizGroup(): Promise<AppState> {
   const newGames = state.games.map((game) => {
     if (game.key !== "quiz") return game;
     const nextGroup = (game.quizCurrentGroup || 0) + 1;
-    return { ...game, quizCurrentGroup: nextGroup };
+    const openedGroup = Math.max(0, Math.min(4, nextGroup - 1));
+    const quizOpenGroups = normalizeQuizOpenGroups([...(game.quizOpenGroups || []), openedGroup]);
+    return { ...game, quizCurrentGroup: nextGroup, quizOpenGroups };
   });
   const newState = { ...state, games: newGames };
 
@@ -624,7 +749,73 @@ export async function advanceQuizGroup(): Promise<AppState> {
     const quiz = list.find(g => g.key === "quiz");
     if (quiz) {
       const nextGroup = (quiz.quizCurrentGroup || 0) + 1;
-      await pb.collection("games").update(quiz.id, { quizCurrentGroup: nextGroup });
+      const openedGroup = Math.max(0, Math.min(4, nextGroup - 1));
+      const quizOpenGroups = normalizeQuizOpenGroups([...(quiz.quizOpenGroups || []), openedGroup]);
+      await pb.collection("games").update(quiz.id, { quizCurrentGroup: nextGroup, quizOpenGroups });
+    }
+  }
+
+  await saveState(newState);
+  return available ? await loadState() : newState;
+}
+
+export async function openQuizGroup(groupIndex: number): Promise<AppState> {
+  if (!Number.isInteger(groupIndex) || groupIndex < 0 || groupIndex > 4) {
+    throw new Error("Quiz group index must be between 0 and 4");
+  }
+  const state = await loadState();
+  const newGames = state.games.map((game) => {
+    if (game.key !== "quiz") return game;
+    return {
+      ...game,
+      isOpen: true,
+      quizOpenGroups: normalizeQuizOpenGroups([...(game.quizOpenGroups || []), groupIndex])
+    };
+  });
+  const newState = { ...state, games: newGames };
+
+  const available = await checkPocketBase();
+  if (available) {
+    const list = await pb.collection("games").getFullList();
+    const quiz = list.find(g => g.key === "quiz");
+    if (quiz) {
+      await pb.collection("games").update(quiz.id, {
+        isOpen: true,
+        quizOpenGroups: normalizeQuizOpenGroups([...(quiz.quizOpenGroups || []), groupIndex])
+      });
+    }
+  }
+
+  await saveState(newState);
+  return available ? await loadState() : newState;
+}
+
+export async function closeQuizGroup(groupIndex: number): Promise<AppState> {
+  if (!Number.isInteger(groupIndex) || groupIndex < 0 || groupIndex > 4) {
+    throw new Error("Quiz group index must be between 0 and 4");
+  }
+  const state = await loadState();
+  const newGames = state.games.map((game) => {
+    if (game.key !== "quiz") return game;
+    const quizOpenGroups = normalizeQuizOpenGroups(game.quizOpenGroups || []).filter((index) => index !== groupIndex);
+    return {
+      ...game,
+      quizOpenGroups,
+      isOpen: quizOpenGroups.length > 0
+    };
+  });
+  const newState = { ...state, games: newGames };
+
+  const available = await checkPocketBase();
+  if (available) {
+    const list = await pb.collection("games").getFullList();
+    const quiz = list.find(g => g.key === "quiz");
+    if (quiz) {
+      const quizOpenGroups = normalizeQuizOpenGroups(quiz.quizOpenGroups || []).filter((index) => index !== groupIndex);
+      await pb.collection("games").update(quiz.id, {
+        isOpen: quizOpenGroups.length > 0,
+        quizOpenGroups
+      });
     }
   }
 
@@ -638,6 +829,9 @@ export async function submitGameResult(input: {
   answers: Record<string, unknown>;
   score: number;
   pendingBingoScore?: boolean;
+  quizSessionIndex?: number;
+  sectorKey?: string;
+  sectorName?: string;
 }): Promise<{ result: GameResult; player: Player; rank: number }> {
   const state = await loadState();
   const game = state.games.find((g) => g.key === input.gameKey);
@@ -676,6 +870,31 @@ export async function submitGameResult(input: {
     return await persistGameResult(state, input, isPending);
   }
 
+  if (input.gameKey === "quiz") {
+    const quizSessionIndex = Number.isInteger(input.quizSessionIndex) ? input.quizSessionIndex as number : 0;
+    if (quizSessionIndex < 0 || quizSessionIndex > 4) {
+      throw new Error("Quiz group index must be between 0 and 4");
+    }
+    const openGroups = normalizeQuizOpenGroups(game?.quizOpenGroups || []);
+    if (!game?.isOpen || !openGroups.includes(quizSessionIndex)) {
+      throw new Error("该游戏暂未开放");
+    }
+    if (state.gameResults.some((result) => (
+      result.player === input.playerId &&
+      result.gameKey === "quiz" &&
+      (Number.isInteger(result.quizSessionIndex) ? result.quizSessionIndex : 0) === quizSessionIndex
+    ))) {
+      throw new Error("该组 Quiz 已完成，不能重复提交");
+    }
+    const defaults = getQuizSectorDefaults(quizSessionIndex);
+    return await persistGameResult(state, {
+      ...input,
+      quizSessionIndex,
+      sectorKey: input.sectorKey || defaults.sectorKey,
+      sectorName: input.sectorName || defaults.sectorName
+    }, false);
+  }
+
   // === 其他游戏：必须 isOpen=true ===
   if (!game?.isOpen) {
     throw new Error("该游戏暂未开放");
@@ -696,6 +915,9 @@ async function persistGameResult(
     answers: Record<string, unknown>;
     score: number;
     pendingBingoScore?: boolean;
+    quizSessionIndex?: number;
+    sectorKey?: string;
+    sectorName?: string;
   },
   isPending: boolean
 ): Promise<{ result: GameResult; player: Player; rank: number }> {
@@ -710,7 +932,10 @@ async function persistGameResult(
     score: Math.max(0, Math.min(100, Math.round(input.score))),
     maxScore: 100,
     completedAt: nowIso(),
-    pendingBingoScore: isPending
+    pendingBingoScore: isPending,
+    quizSessionIndex: input.quizSessionIndex,
+    sectorKey: input.sectorKey,
+    sectorName: input.sectorName
   };
 
   const available = await checkPocketBase();
@@ -722,7 +947,10 @@ async function persistGameResult(
       score: result.score,
       maxScore: result.maxScore,
       completedAt: result.completedAt,
-      pendingBingoScore: isPending
+      pendingBingoScore: isPending,
+      quizSessionIndex: result.quizSessionIndex,
+      sectorKey: result.sectorKey,
+      sectorName: result.sectorName
     });
     result.id = created.id;
   }
@@ -742,7 +970,8 @@ async function persistGameResult(
   const totalScore = gameResults
     .filter((item) => item.player === input.playerId && !item.pendingBingoScore)
     .reduce((sum, item) => sum + item.score, 0);
-  const completedGames = [...new Set([...state.players[playerIndex].completedGames, input.gameKey])] as GameKey[];
+  const playerResults = gameResults.filter((item) => item.player === input.playerId && !item.pendingBingoScore);
+  const completedGames = getCompletedGamesForPlayer(state.players[playerIndex], playerResults, input.gameKey);
   const finalSubmitted = GAME_ORDER.every((key) => completedGames.includes(key));
   const player: Player = {
     ...state.players[playerIndex],
@@ -769,7 +998,25 @@ async function persistGameResult(
 
 export async function getQuestions(gameKey: GameKey) {
   const state = await loadState();
-  return state.questions.filter((question) => question.gameKey === gameKey && question.isActive).sort((a, b) => a.order - b.order);
+  return state.questions
+    .map(normalizeQuestion)
+    .filter((question) => question.gameKey === gameKey && question.isActive)
+    .sort((a, b) => a.order - b.order);
+}
+
+export async function getQuizSessionSnapshot(playerId: string): Promise<QuizSessionSnapshot> {
+  const state = await loadState();
+  const quizGame = state.games.find((game) => game.key === "quiz");
+  const results = state.gameResults
+    .filter((result) => result.player === playerId && result.gameKey === "quiz")
+    .map(normalizeGameResult);
+  return {
+    openGroups: normalizeQuizOpenGroups(quizGame?.quizOpenGroups || []),
+    completedGroups: normalizeQuizOpenGroups(results
+      .map((result) => result.quizSessionIndex)
+      .filter((index): index is number => Number.isInteger(index))),
+    results
+  };
 }
 
 export async function getLobbySnapshot(playerId: string) {
@@ -779,7 +1026,8 @@ export async function getLobbySnapshot(playerId: string) {
     state,
     player,
     rank: player ? getPlayerRank(state.players, player.id) : 0,
-    results: state.gameResults.filter((result) => result.player === playerId)
+    results: state.gameResults.filter((result) => result.player === playerId),
+    quizProgress: buildQuizProgress(state, playerId)
   };
 }
 
@@ -813,10 +1061,15 @@ export async function resetDemoData(): Promise<void> {
         await pb.collection("game_results").delete(r.id);
       }
       for (const game of games) {
-        await pb.collection("games").update(game.id, {
+        const updateData: Record<string, unknown> = {
           isOpen: false,
           bingoScored: game.key === "bingo" ? false : Boolean(game.bingoScored)
-        });
+        };
+        if (game.key === "quiz") {
+          updateData.quizCurrentGroup = 0;
+          updateData.quizOpenGroups = [];
+        }
+        await pb.collection("games").update(game.id, updateData);
       }
     } catch {}
   }

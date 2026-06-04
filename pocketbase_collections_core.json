@@ -235,10 +235,53 @@
         "presentable": false,
         "unique": false,
         "options": {}
+      },
+      {
+        "system": false,
+        "id": "field_quiz_session_index",
+        "name": "quizSessionIndex",
+        "type": "number",
+        "required": false,
+        "presentable": false,
+        "unique": false,
+        "options": {
+          "min": 0,
+          "max": 4,
+          "noDecimal": false
+        }
+      },
+      {
+        "system": false,
+        "id": "field_sector_key",
+        "name": "sectorKey",
+        "type": "text",
+        "required": false,
+        "presentable": false,
+        "unique": false,
+        "options": {
+          "min": null,
+          "max": 80,
+          "pattern": ""
+        }
+      },
+      {
+        "system": false,
+        "id": "field_sector_name",
+        "name": "sectorName",
+        "type": "text",
+        "required": false,
+        "presentable": false,
+        "unique": false,
+        "options": {
+          "min": null,
+          "max": 120,
+          "pattern": ""
+        }
       }
     ],
     "indexes": [
-      "CREATE UNIQUE INDEX `idx_game_results_player_game` ON `game_results` (`player`, `gameKey`)"
+      "CREATE INDEX `idx_game_results_player_game` ON `game_results` (`player`, `gameKey`)",
+      "CREATE INDEX `idx_game_results_player_game_quiz_session` ON `game_results` (`player`, `gameKey`, `quizSessionIndex`)"
     ],
     "listRule": "",
     "viewRule": "",
@@ -348,10 +391,189 @@
           "max": 5,
           "noDecimal": false
         }
+      },
+      {
+        "system": false,
+        "id": "field_quiz_open_groups",
+        "name": "quizOpenGroups",
+        "type": "json",
+        "required": false,
+        "presentable": false,
+        "unique": false,
+        "options": {
+          "maxSize": 2000000
+        }
       }
     ],
     "indexes": [
       "CREATE UNIQUE INDEX `idx_games_key` ON `games` (`key`)"
+    ],
+    "listRule": "",
+    "viewRule": "",
+    "createRule": "",
+    "updateRule": "",
+    "deleteRule": "",
+    "options": {}
+  },
+  {
+    "id": "pbc_questions000",
+    "created": "2026-06-01 00:00:00.000Z",
+    "updated": "2026-06-04 00:00:00.000Z",
+    "name": "questions",
+    "type": "base",
+    "system": false,
+    "schema": [
+      {
+        "system": false,
+        "id": "field_questions_game_key",
+        "name": "gameKey",
+        "type": "text",
+        "required": true,
+        "presentable": false,
+        "unique": false,
+        "options": {
+          "min": null,
+          "max": 50,
+          "pattern": ""
+        }
+      },
+      {
+        "system": false,
+        "id": "field_questions_type",
+        "name": "type",
+        "type": "text",
+        "required": true,
+        "presentable": false,
+        "unique": false,
+        "options": {
+          "min": null,
+          "max": 50,
+          "pattern": ""
+        }
+      },
+      {
+        "system": false,
+        "id": "field_questions_title",
+        "name": "title",
+        "type": "text",
+        "required": true,
+        "presentable": true,
+        "unique": false,
+        "options": {
+          "min": null,
+          "max": 500,
+          "pattern": ""
+        }
+      },
+      {
+        "system": false,
+        "id": "field_questions_options",
+        "name": "options",
+        "type": "json",
+        "required": false,
+        "presentable": false,
+        "unique": false,
+        "options": {
+          "maxSize": 2000000
+        }
+      },
+      {
+        "system": false,
+        "id": "field_questions_correct_answer",
+        "name": "correctAnswer",
+        "type": "json",
+        "required": true,
+        "presentable": false,
+        "unique": false,
+        "options": {
+          "maxSize": 2000000
+        }
+      },
+      {
+        "system": false,
+        "id": "field_questions_score",
+        "name": "score",
+        "type": "number",
+        "required": true,
+        "presentable": false,
+        "unique": false,
+        "options": {
+          "min": 0,
+          "max": 100,
+          "noDecimal": false
+        }
+      },
+      {
+        "system": false,
+        "id": "field_questions_order",
+        "name": "order",
+        "type": "number",
+        "required": true,
+        "presentable": false,
+        "unique": false,
+        "options": {
+          "min": 1,
+          "max": null,
+          "noDecimal": false
+        }
+      },
+      {
+        "system": false,
+        "id": "field_questions_active",
+        "name": "isActive",
+        "type": "bool",
+        "required": false,
+        "presentable": false,
+        "unique": false,
+        "options": {}
+      },
+      {
+        "system": false,
+        "id": "field_questions_sector_key",
+        "name": "sectorKey",
+        "type": "text",
+        "required": false,
+        "presentable": false,
+        "unique": false,
+        "options": {
+          "min": null,
+          "max": 80,
+          "pattern": ""
+        }
+      },
+      {
+        "system": false,
+        "id": "field_questions_sector_name",
+        "name": "sectorName",
+        "type": "text",
+        "required": false,
+        "presentable": false,
+        "unique": false,
+        "options": {
+          "min": null,
+          "max": 120,
+          "pattern": ""
+        }
+      },
+      {
+        "system": false,
+        "id": "field_questions_quiz_session_index",
+        "name": "quizSessionIndex",
+        "type": "number",
+        "required": false,
+        "presentable": false,
+        "unique": false,
+        "options": {
+          "min": 0,
+          "max": 4,
+          "noDecimal": false
+        }
+      }
+    ],
+    "indexes": [
+      "CREATE INDEX `idx_questions_gameKey` ON `questions` (`gameKey`)",
+      "CREATE INDEX `idx_questions_order` ON `questions` (`order`)",
+      "CREATE INDEX `idx_questions_quiz_session` ON `questions` (`gameKey`, `quizSessionIndex`)"
     ],
     "listRule": "",
     "viewRule": "",

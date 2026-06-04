@@ -1,189 +1,231 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Countdown from "@/components/Countdown";
 import Layout from "@/components/Layout";
 import ResultModal from "@/components/ResultModal";
-import QuizStartModal from "@/components/QuizStartModal";
-import { calculateQuizScore } from "@/lib/scoring";
-import { getGameResult } from "@/lib/storage";
-import { useAppState, useCurrentPlayer, useGameStatus, useQuestions, useSubmitGameResult } from "@/hooks/use-game-data";
+import { useAppState, useCurrentPlayer, useQuestions, useSubmitGameResult } from "@/hooks/use-game-data";
+import type { Question } from "@/types";
 
-const GROUP_SECONDS = 60; // 每组1分钟
-const TOTAL_GROUPS = 5; // 共5个板块
-const QUESTIONS_PER_GROUP = 2; // 每板块2题
+const GROUP_SECONDS = 60;
+const TOTAL_GROUPS = 5;
+
+type QuizModalState = {
+  open: boolean;
+  roundScore: number;
+  totalScore: number;
+  rank: number;
+  quizTotalScore: number;
+  completedAll: boolean;
+};
+
+function getQuizSessionIndex(question: Question): number {
+  if (Number.isInteger(question.quizSessionIndex)) {
+    return question.quizSessionIndex as number;
+  }
+  return Math.max(0, Math.min(TOTAL_GROUPS - 1, Math.floor((Math.max(1, question.order) - 1) / 2)));
+}
+
+function getSectorName(index: number, questions: Question[]): string {
+  return questions.find((question) => question.sectorName)?.sectorName || `Sector ${index + 1}`;
+}
+
+function isCorrectAnswer(question: Question, answer: string | undefined): boolean {
+  if (!answer) return false;
+  return Array.isArray(question.correctAnswer)
+    ? question.correctAnswer.includes(answer)
+    : question.correctAnswer === answer;
+}
 
 export default function QuizPage() {
   const router = useRouter();
-  const { playerId, refresh } = useCurrentPlayer();
+  const { playerId, refresh: refreshPlayer } = useCurrentPlayer();
+  const { state, refresh: refreshState, loading: stateLoading } = useAppState();
   const questions = useQuestions("quiz");
   const submitGameResult = useSubmitGameResult();
-  const isOpen = useGameStatus("quiz");
-  const { state } = useAppState();
-  const quizGame = state.games.find(g => g.key === "quiz");
-  const quizIsOpen = Boolean(quizGame?.isOpen || isOpen === true);
-  const currentGroup = quizGame?.quizCurrentGroup || 0;
-  
-  const [hasStarted, setHasStarted] = useState(false);
-  const [localGroupIndex, setLocalGroupIndex] = useState(0);
-  const [questionIndexInGroup, setQuestionIndexInGroup] = useState(0);
+
+  const [activeSectorIndex, setActiveSectorIndex] = useState<number | null>(null);
+  const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [seconds, setSeconds] = useState(GROUP_SECONDS);
-  const [existing, setExisting] = useState<Awaited<ReturnType<typeof getGameResult>>>(null);
-  const [existingLoading, setExistingLoading] = useState(true);
-  const [modal, setModal] = useState({ open: false, score: 0, total: 0, rank: 0 });
-  const [isLeaving, setIsLeaving] = useState(false);
   const [message, setMessage] = useState("");
-  const [waitingForNextGroup, setWaitingForNextGroup] = useState(false);
-  const [showStartModal, setShowStartModal] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
+  const [isLeaving, setIsLeaving] = useState(false);
+  const [modal, setModal] = useState<QuizModalState>({
+    open: false,
+    roundScore: 0,
+    totalScore: 0,
+    rank: 0,
+    quizTotalScore: 0,
+    completedAll: false
+  });
 
-  // 计算当前题目的索引
-  const currentQuestionIndex = localGroupIndex * QUESTIONS_PER_GROUP + questionIndexInGroup;
-  const currentQuestion = questions[currentQuestionIndex];
+  const submittingRef = useRef(false);
+
+  const quizGame = state.games.find((game) => game.key === "quiz");
+  const quizIsOpen = Boolean(quizGame?.isOpen);
+  const quizOpenGroups = quizGame?.quizOpenGroups || [];
+  const playerQuizResults = useMemo(() => (
+    state.gameResults.filter((result) => result.player === playerId && result.gameKey === "quiz")
+  ), [playerId, state.gameResults]);
+
+  const quizSectors = useMemo(() => {
+    const activeQuestions = questions
+      .filter((question) => question.gameKey === "quiz" && question.isActive === true)
+      .map((question) => ({
+        ...question,
+        quizSessionIndex: getQuizSessionIndex(question)
+      }));
+
+    return Array.from({ length: TOTAL_GROUPS }, (_, index) => {
+      const sectorQuestions = activeQuestions
+        .filter((question) => question.quizSessionIndex === index)
+        .sort((a, b) => a.order - b.order)
+        .slice(0, 2);
+      const result = playerQuizResults.find((item) => (
+        (Number.isInteger(item.quizSessionIndex) ? item.quizSessionIndex : 0) === index
+      ));
+
+      return {
+        index,
+        sectorName: getSectorName(index, sectorQuestions),
+        questions: sectorQuestions,
+        isOpen: quizOpenGroups.includes(index),
+        result
+      };
+    });
+  }, [playerQuizResults, questions, quizOpenGroups]);
+
+  const completedCount = quizSectors.filter((sector) => Boolean(sector.result)).length;
+  const quizTotalScore = quizSectors.reduce((sum, sector) => sum + (sector.result?.score || 0), 0);
+  const activeSector = activeSectorIndex === null ? null : quizSectors[activeSectorIndex];
+  const currentQuestion = activeSector?.questions[currentQuestionIndex];
   const selectedAnswer = currentQuestion ? answers[currentQuestion.id] : "";
-  
-  // 计算正确数和分数
-  const correctCount = useMemo(() => questions.filter((question) => answers[question.id] === question.correctAnswer).length, [answers, questions]);
-  const score = calculateQuizScore(correctCount);
-
-  // 检查是否完成当前组
-  const isGroupComplete = (questionIndexInGroup + 1) >= QUESTIONS_PER_GROUP;
-  // 检查是否是最后一组
-  const isLastGroup = localGroupIndex >= TOTAL_GROUPS - 1;
 
   useEffect(() => {
     if (playerId === null) router.push("/register");
   }, [playerId, router]);
 
   useEffect(() => {
-    if (!playerId) {
-      setExisting(null);
-      setExistingLoading(playerId === undefined);
-      return;
-    }
-
-    let active = true;
-    const currentPlayerId = playerId;
-    async function loadExisting() {
-      setExistingLoading(true);
-      try {
-        const result = await getGameResult(currentPlayerId, "quiz");
-        if (!active) return;
-        setExisting(result);
-      } finally {
-        if (active) setExistingLoading(false);
-      }
-    }
-    loadExisting();
-    return () => {
-      active = false;
-    };
-  }, [playerId]);
-
-  // 监听后台的板块更新
-  // 关键修复：后台 currentGroup 只代表"允许答题的最大组"，不强制用户跳转
-  // 用户始终按自己的节奏从第 1 组开始答题
-  // 当用户在等待时，如果后台开放了下一组（currentGroup >= localGroupIndex），则解除等待
-  useEffect(() => {
-    if (!hasStarted) return;
-    if (waitingForNextGroup && currentGroup >= localGroupIndex) {
-      // 后台已经开放到用户当前等待的这一组，解除等待
-      setWaitingForNextGroup(false);
-      setSeconds(GROUP_SECONDS);
-      setMessage("");
-    }
-  }, [currentGroup, localGroupIndex, hasStarted, waitingForNextGroup]);
-
-  // 倒计时逻辑
-  useEffect(() => {
-    if (!hasStarted || waitingForNextGroup || modal.open || existing || !quizIsOpen) return;
+    if (activeSectorIndex === null || modal.open || submitting) return;
     const timer = window.setInterval(() => setSeconds((value) => Math.max(0, value - 1)), 1000);
     return () => window.clearInterval(timer);
-  }, [hasStarted, waitingForNextGroup, modal.open, existing, quizIsOpen]);
+  }, [activeSectorIndex, modal.open, submitting]);
 
-  // 时间到逻辑
   useEffect(() => {
-    if (seconds > 0 || !hasStarted || waitingForNextGroup || modal.open || existing || !quizIsOpen) return;
-    
-    if (isLastGroup && isGroupComplete) {
-      submitAllAnswers();
-    } else if (isGroupComplete) {
-      // 本组答完，进入下一组（或等待后台开放）
-      const nextGroup = localGroupIndex + 1;
-      setLocalGroupIndex(nextGroup);
-      setQuestionIndexInGroup(0);
-      if (currentGroup >= nextGroup) {
-        // 后台已经开放到下一组，直接继续
-        setSeconds(GROUP_SECONDS);
-        setMessage("");
-      } else {
-        // 后台还没开放，进入等待
-        setWaitingForNextGroup(true);
-        setMessage("等待后台开启下一板块...");
-      }
-    } else {
-      // 时间到但本组未答完，进入等待
-      setWaitingForNextGroup(true);
-      setMessage("等待后台开启下一板块...");
-    }
-  }, [seconds, hasStarted, waitingForNextGroup, modal.open, existing, quizIsOpen, isLastGroup, isGroupComplete, localGroupIndex, currentGroup]);
-
-  const shouldLeaveClosedGame = isOpen === false && !quizGame?.isOpen && !existingLoading && !existing && !modal.open;
+    if (seconds > 0 || activeSectorIndex === null || modal.open || submittingRef.current) return;
+    submitSector();
+  }, [seconds, activeSectorIndex, modal.open]);
 
   function goLobby() {
     setIsLeaving(true);
     router.push("/lobby");
   }
 
-  async function handleStart() {
-    setShowStartModal(false);
-    setHasStarted(true);
+  function closeModalAndRefresh() {
+    setModal({
+      open: false,
+      roundScore: 0,
+      totalScore: 0,
+      rank: 0,
+      quizTotalScore: 0,
+      completedAll: false
+    });
+    submittingRef.current = false;
+    setActiveSectorIndex(null);
+    setCurrentQuestionIndex(0);
+    setAnswers({});
+    setSeconds(GROUP_SECONDS);
+    refreshState();
+    refreshPlayer();
+  }
+
+  function startSector(index: number) {
+    const sector = quizSectors[index];
+    if (!sector || sector.result || !sector.isOpen) return;
+    setActiveSectorIndex(index);
+    setCurrentQuestionIndex(0);
+    setAnswers({});
+    setSeconds(GROUP_SECONDS);
+    setMessage("");
   }
 
   function chooseAnswer(option: string) {
-    if (!currentQuestion || !quizIsOpen || existing || waitingForNextGroup || !hasStarted) return;
+    if (!currentQuestion || submitting) return;
     setAnswers((current) => ({ ...current, [currentQuestion.id]: option }));
     setMessage("");
   }
 
   function goNext() {
+    if (!currentQuestion || !activeSector) return;
     if (!selectedAnswer) {
       setMessage("请先选择本题答案");
       return;
     }
-    if (isGroupComplete) {
-      if (isLastGroup) {
-        submitAllAnswers();
-      } else {
-        // 本组答完，推进到下一组
-        const nextGroup = localGroupIndex + 1;
-        setLocalGroupIndex(nextGroup);
-        setQuestionIndexInGroup(0);
-        if (currentGroup >= nextGroup) {
-          // 后台已经开放到下一组，直接继续答题
-          setSeconds(GROUP_SECONDS);
-          setMessage("");
-        } else {
-          // 后台还没开放，进入等待
-          setWaitingForNextGroup(true);
-          setMessage("等待后台开启下一板块...");
-        }
-      }
-    } else {
-      setQuestionIndexInGroup((prev) => prev + 1);
+    if (currentQuestionIndex < activeSector.questions.length - 1) {
+      setCurrentQuestionIndex((index) => index + 1);
+      return;
     }
+    submitSector();
   }
 
-  async function submitAllAnswers() {
-    if (!playerId) return;
+  async function submitSector() {
+    if (!playerId || !activeSector || submittingRef.current) return;
+    submittingRef.current = true;
+    setSubmitting(true);
     try {
-      const outcome = await submitGameResult({ playerId, gameKey: "quiz", answers, score });
-      refresh();
-      setExisting(outcome.result);
-      setModal({ open: true, score: outcome.result.score, total: outcome.player.totalScore, rank: outcome.rank });
+      const sectorScore = activeSector.questions.reduce((sum, question) => (
+        sum + (isCorrectAnswer(question, answers[question.id]) ? question.score : 0)
+      ), 0);
+      const outcome = await submitGameResult({
+        playerId,
+        gameKey: "quiz",
+        answers,
+        score: sectorScore,
+        quizSessionIndex: activeSector.index,
+        sectorKey: activeSector.questions[0]?.sectorKey || `sector-${activeSector.index + 1}`,
+        sectorName: activeSector.sectorName
+      });
+
+      const completedGroups = new Set([
+        ...playerQuizResults
+          .map((result) => result.quizSessionIndex)
+          .filter((index): index is number => Number.isInteger(index)),
+        activeSector.index
+      ]);
+      const nextQuizTotalScore = quizTotalScore + outcome.result.score;
+      const completedAll = completedGroups.size >= TOTAL_GROUPS;
+
+      await refreshState();
+      await refreshPlayer();
+      setModal({
+        open: true,
+        roundScore: outcome.result.score,
+        totalScore: outcome.player.totalScore,
+        rank: outcome.rank,
+        quizTotalScore: nextQuizTotalScore,
+        completedAll
+      });
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "提交失败");
+      const errMsg = error instanceof Error ? error.message : "提交失败";
+      setMessage(errMsg);
+      // 提交失败时也弹出结算框，让用户知道倒计时已结束
+      try {
+        await refreshState();
+        await refreshPlayer();
+      } catch { /* ignore refresh error */ }
+      setModal({
+        open: true,
+        roundScore: 0,
+        totalScore: 0,
+        rank: 0,
+        quizTotalScore: 0,
+        completedAll: false
+      });
+    } finally {
+      setSubmitting(false);
+      submittingRef.current = false;
     }
   }
 
@@ -195,90 +237,131 @@ export default function QuizPage() {
     );
   }
 
-  if (shouldLeaveClosedGame) {
+  if (stateLoading || playerId === undefined) {
     return (
       <Layout title="Sector Quiz" eyebrow="GAME 02">
-        <section className="statusBanner">游戏加载中,请耐心等待</section>
+        <section className="statusBanner">正在同步 Quiz 状态...</section>
+      </Layout>
+    );
+  }
+
+  if (!quizIsOpen) {
+    return (
+      <Layout title="Sector Quiz" eyebrow="GAME 02">
+        <section className="statusBanner">Quiz 尚未开放</section>
         <button className="primaryButton" type="button" onClick={goLobby}>
-          回到大厅
+          返回活动大厅
         </button>
       </Layout>
     );
   }
 
-  return (
-    <Layout title="Sector Quiz" eyebrow="GAME 02">
-      <div style={{ textAlign: 'center', marginBottom: '24px' }}>
-        <div style={{ fontSize: '64px', marginBottom: '8px' }}>⚡</div>
-        <h2 style={{ fontSize: '32px', fontWeight: 'bold', margin: 0, background: 'linear-gradient(90deg, #40d88a, #00b86a)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
-          Sector Quiz
-        </h2>
-        <p style={{ color: 'var(--ink)', margin: '8px 0 0 0', fontSize: '14px' }}>第 {localGroupIndex + 1} 板块 / 共 {TOTAL_GROUPS} 板块</p>
-      </div>
+  if (activeSector && currentQuestion) {
+    return (
+      <Layout title="Sector Quiz" eyebrow="GAME 02">
+        <div style={{ textAlign: "center", marginBottom: 24 }}>
+          <h2 style={{ fontSize: 28, fontWeight: "bold", margin: 0 }}>{activeSector.sectorName}</h2>
+          <p style={{ color: "var(--muted)", margin: "8px 0 0" }}>
+            Sector {activeSector.index + 1} / 题目 {currentQuestionIndex + 1}/{activeSector.questions.length}
+          </p>
+        </div>
 
-      {hasStarted && !waitingForNextGroup && <Countdown seconds={seconds} total={GROUP_SECONDS} currentIndex={currentQuestionIndex} totalQuestions={TOTAL_GROUPS * QUESTIONS_PER_GROUP} />}
+        <Countdown
+          seconds={seconds}
+          total={GROUP_SECONDS}
+          currentIndex={currentQuestionIndex}
+          totalQuestions={activeSector.questions.length}
+        />
 
-      {!existingLoading && existing && <section className="statusBanner">该游戏已完成，本关得分 {existing.score}，不能重复提交</section>}
-
-      {hasStarted && currentQuestion && !waitingForNextGroup && (
         <section className="questionStack">
-          <article className="questionCard" style={{ padding: '24px 20px' }}>
-            <h3 style={{ fontSize: '22px', fontWeight: 'bold', margin: '0 0 20px 0', lineHeight: '1.4' }}>
-              第 {questionIndexInGroup + 1} 题：{currentQuestion.title}
+          <article className="questionCard" style={{ padding: "24px 20px" }}>
+            <h3 style={{ fontSize: 22, fontWeight: "bold", margin: "0 0 20px", lineHeight: 1.4 }}>
+              {currentQuestion.title}
             </h3>
-            <div className="optionGrid" style={{ gap: '12px' }}>
-              {currentQuestion.options?.map((option, idx) => (
+            <div className="optionGrid" style={{ gap: 12 }}>
+              {currentQuestion.options?.map((option, index) => (
                 <button
                   className={selectedAnswer === option ? "selected" : ""}
-                  disabled={Boolean(existing) || !quizIsOpen || waitingForNextGroup || !hasStarted}
+                  disabled={submitting}
                   key={option}
                   type="button"
                   onClick={() => chooseAnswer(option)}
-                  style={{ padding: '14px 16px', fontSize: '16px', textAlign: 'left' }}
+                  style={{ padding: "14px 16px", fontSize: 16, textAlign: "left" }}
                 >
-                  <span style={{ fontWeight: 'bold', marginRight: '8px' }}>{String.fromCharCode(65 + idx)}.</span>
+                  <span style={{ fontWeight: "bold", marginRight: 8 }}>{String.fromCharCode(65 + index)}.</span>
                   {option}
                 </button>
               ))}
             </div>
           </article>
         </section>
-      )}
 
-      {waitingForNextGroup && (
-        <section className="statusBanner" style={{ margin: '20px 0', textAlign: 'center' }}>
-          <div style={{ fontSize: '48px', marginBottom: '16px' }}>⏳</div>
-          <p>本板块已完成！</p>
-          <p style={{ color: 'var(--muted)', marginTop: '8px' }}>{message}</p>
-        </section>
-      )}
-
-      {hasStarted && !waitingForNextGroup && (
         <section className="statusPanel">
-          <b>已完成 {Object.keys(answers).length}/{TOTAL_GROUPS * QUESTIONS_PER_GROUP}</b>
-          <span>{message || "选择答案后点击继续"}</span>
+          <b>本组已选择 {Object.keys(answers).length}/{activeSector.questions.length}</b>
+          <span>{message || "选择答案后继续，倒计时结束会自动提交本组答案"}</span>
         </section>
-      )}
 
-      {hasStarted && !waitingForNextGroup && currentQuestion && (
-        <button className="primaryButton" disabled={Boolean(existing) || !quizIsOpen || !selectedAnswer} type="button" onClick={goNext}>
-          {isGroupComplete && isLastGroup ? "提交成绩" : isGroupComplete ? "完成本板块" : "继续"}
+        <button className="primaryButton" disabled={submitting || !selectedAnswer} type="button" onClick={goNext}>
+          {submitting ? "提交中..." : currentQuestionIndex === activeSector.questions.length - 1 ? "提交本组" : "继续"}
         </button>
-      )}
 
-      <QuizStartModal
-        open={showStartModal && !existing && quizIsOpen}
-        onStart={handleStart}
-      />
+        <ResultModal
+          open={modal.open}
+          gameName={modal.completedAll ? `Sector Quiz 已完成，本游戏总分 ${modal.quizTotalScore}/100` : `${activeSector.sectorName} 已完成`}
+          roundScore={modal.completedAll ? modal.quizTotalScore : modal.roundScore}
+          totalScore={modal.totalScore}
+          rank={modal.rank}
+          buttonText={modal.completedAll ? "返回大厅" : "确定"}
+          onBackLobby={goLobby}
+          onClose={modal.completedAll ? undefined : closeModalAndRefresh}
+        />
+      </Layout>
+    );
+  }
 
-      <ResultModal
-        open={modal.open}
-        gameName="Sector Quiz"
-        roundScore={modal.score}
-        totalScore={modal.total}
-        rank={modal.rank}
-        onBackLobby={goLobby}
-      />
+  return (
+    <Layout title="Sector Quiz" eyebrow="GAME 02">
+      <div style={{ textAlign: "center", marginBottom: 24 }}>
+        <h2 style={{ fontSize: 32, fontWeight: "bold", margin: 0 }}>Sector Quiz</h2>
+        <p style={{ color: "var(--muted)", margin: "8px 0 0" }}>
+          Quiz 总进度：已完成 {completedCount}/{TOTAL_GROUPS} / 当前 Quiz 得分：{quizTotalScore}/100
+        </p>
+      </div>
+
+      <section className="adminList">
+        {quizSectors.map((sector) => {
+          const status = sector.result ? "已完成" : sector.isOpen ? "可答题" : "未开放";
+          return (
+            <div className="adminRow" key={sector.index} style={{ alignItems: "center" }}>
+              <div>
+                <b>{sector.sectorName}</b>
+                <span>
+                  Sector {sector.index + 1} / 状态：{status}
+                  {sector.result ? ` / 得分：${sector.result.score}` : ""}
+                </span>
+                <span>题目数：{sector.questions.length}/2</span>
+              </div>
+              {sector.result ? (
+                <button className="secondaryButton smallButton" disabled type="button">
+                  已完成
+                </button>
+              ) : sector.isOpen ? (
+                <button className="primaryButton smallButton" type="button" onClick={() => startSector(sector.index)}>
+                  进入答题
+                </button>
+              ) : (
+                <button className="secondaryButton smallButton" disabled type="button">
+                  等待主持人开启
+                </button>
+              )}
+            </div>
+          );
+        })}
+      </section>
+
+      <button className="secondaryButton" type="button" onClick={goLobby} style={{ marginTop: 18 }}>
+        返回活动大厅
+      </button>
     </Layout>
   );
 }

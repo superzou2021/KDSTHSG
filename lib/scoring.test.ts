@@ -37,20 +37,20 @@ test("calculateQuizScore: 边界情况测试", () => {
 
 // ========== 真假故事游戏评分测试 ==========
 test("calculateStoryScore: 全对加分测试", () => {
-  assert.equal(calculateStoryScore([true, true, true]), 100); // 全对 30*3+10=100
-  assert.equal(calculateStoryScore([true, false, true]), 60); // 两个对 60
-  assert.equal(calculateStoryScore([false, false, false]), 0); // 全错
+  assert.equal(calculateStoryScore([true, true]), 100); // 全对 50*2=100
+  assert.equal(calculateStoryScore([true, false]), 50); // 一个对 50
+  assert.equal(calculateStoryScore([false, false]), 0); // 全错
 });
 
 test("calculateStoryScore: 不同数量题目测试", () => {
-  assert.equal(calculateStoryScore([true, true]), 60); // 两个对 60
-  assert.equal(calculateStoryScore([true]), 30); // 一个对 30
+  assert.equal(calculateStoryScore([true, true]), 100); // 两个对 100
+  assert.equal(calculateStoryScore([true]), 50); // 一个对 50
   assert.equal(calculateStoryScore([]), 0); // 空数组
 });
 
 test("calculateStoryScore: 边界情况测试", () => {
-  assert.equal(calculateStoryScore([true, true, true, true]), 100); // 四个对也会被封顶
-  assert.equal(calculateStoryScore([true, true, false, true]), 90); // 30*3=90
+  assert.equal(calculateStoryScore([true, true, true]), 100); // 三个对也会被封顶
+  assert.equal(calculateStoryScore([true, false, true]), 100); // 50*2=100
 });
 
 // ========== 站立淘汰游戏评分测试 ==========
@@ -117,9 +117,9 @@ test("calculateQuizScore: 极端值测试", () => {
 });
 
 test("calculateStoryScore: 各种组合测试", () => {
-  assert.equal(calculateStoryScore([true, false, true]), 60); // 两个对
-  assert.equal(calculateStoryScore([false, true, false]), 30); // 一个对
-  assert.equal(calculateStoryScore([false, false, true, true]), 60); // 两个对
+  assert.equal(calculateStoryScore([true, false]), 50); // 一个对
+  assert.equal(calculateStoryScore([false, true]), 50); // 一个对
+  assert.equal(calculateStoryScore([false, false, true, true]), 100); // 两个对
   assert.equal(calculateStoryScore([true, true, true, true, true]), 100); // 封顶
 });
 

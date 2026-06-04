@@ -9,10 +9,7 @@ export function calculateQuizScore(correctCount: number): number {
 export function calculateStoryScore(results: boolean[]): number {
   let score = 0;
   for (const correct of results) {
-    if (correct) score += 30;
-  }
-  if (results.length === 3 && results.every(Boolean)) {
-    score += 10;
+    if (correct) score += 50;
   }
   return Math.max(0, Math.min(score, 100));
 }

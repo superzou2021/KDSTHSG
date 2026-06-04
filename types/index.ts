@@ -26,6 +26,7 @@ export type Game = {
   bingoScored?: boolean;
   bingoPhase?: BingoPhase;
   quizCurrentGroup?: number;
+  quizOpenGroups?: number[];
 };
 
 export type Question = {
@@ -38,6 +39,9 @@ export type Question = {
   score: number;
   order: number;
   isActive: boolean;
+  sectorKey?: string;
+  sectorName?: string;
+  quizSessionIndex?: number;
 };
 
 export type GameResult = {
@@ -49,6 +53,25 @@ export type GameResult = {
   maxScore: number;
   completedAt: string;
   pendingBingoScore?: boolean;
+  quizSessionIndex?: number;
+  sectorKey?: string;
+  sectorName?: string;
+};
+
+export type QuizSessionSnapshot = {
+  openGroups: number[];
+  completedGroups: number[];
+  results: GameResult[];
+};
+
+export type QuizProgress = {
+  completedCount: number;
+  totalCount: 5;
+  score: number;
+  maxScore: 100;
+  openGroups: number[];
+  availableGroups: number[];
+  completedGroups: number[];
 };
 
 export type RankingItem = {

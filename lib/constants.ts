@@ -12,7 +12,7 @@ export const GAME_ORDER: GameKey[] = ["bingo", "quiz", "story", "elimination"];
 
 export const GAMES: Game[] = [
   { id: "game-bingo", key: "bingo", name: "Bingo 猜词", maxScore: 100, isOpen: false, order: 1, bingoScored: false, bingoPhase: "open" },
-  { id: "game-quiz", key: "quiz", name: "Sector Quiz", maxScore: 100, isOpen: false, order: 2, quizCurrentGroup: 0 },
+  { id: "game-quiz", key: "quiz", name: "Sector Quiz", maxScore: 100, isOpen: false, order: 2, quizCurrentGroup: 0, quizOpenGroups: [] },
   { id: "game-story", key: "story", name: "真假故事", maxScore: 100, isOpen: false, order: 3 },
   { id: "game-elimination", key: "elimination", name: "站立淘汰", maxScore: 100, isOpen: false, order: 4 }
 ];
@@ -56,16 +56,19 @@ export const QUESTIONS: Question[] = [
     correctAnswer: answer as string,
     score: 10,
     order: index + 1,
-    isActive: true
+    isActive: true,
+    sectorKey: `sector-${Math.floor(index / 2) + 1}`,
+    sectorName: `Sector ${Math.floor(index / 2) + 1}`,
+    quizSessionIndex: Math.floor(index / 2)
   })),
   {
     id: "story-1",
     gameKey: "story",
-    type: "boolean",
-    title: "第一题：今年年会互动系统支持手机扫码参与。",
-    options: ["真", "假"],
-    correctAnswer: "真",
-    score: 30,
+    type: "story",
+    title: "第一题：同事 A 的三个故事里，哪个是假故事？",
+    options: ["A. 他曾经一天完成 12 场客户访谈", "B. 他把测试服误当生产服上线", "C. 他用 Excel 做过一版完整排行榜"],
+    correctAnswer: "B. 他把测试服误当生产服上线",
+    score: 50,
     order: 1,
     isActive: true
   },
@@ -73,22 +76,11 @@ export const QUESTIONS: Question[] = [
     id: "story-2",
     gameKey: "story",
     type: "story",
-    title: "第二题：同事 A 的三个故事里，哪个是假故事？",
-    options: ["A. 他曾经一天完成 12 场客户访谈", "B. 他把测试服误当生产服上线", "C. 他用 Excel 做过一版完整排行榜"],
-    correctAnswer: "B. 他把测试服误当生产服上线",
-    score: 30,
-    order: 2,
-    isActive: true
-  },
-  {
-    id: "story-3",
-    gameKey: "story",
-    type: "story",
-    title: "第三题：同事 B 的三个故事里，哪个是假故事？",
+    title: "第二题：同事 B 的三个故事里，哪个是假故事？",
     options: ["A. 她负责过 500 人现场活动", "B. 她把二维码印在胸牌背面", "C. 她在大屏上展示完整手机号"],
     correctAnswer: "C. 她在大屏上展示完整手机号",
-    score: 30,
-    order: 3,
+    score: 50,
+    order: 2,
     isActive: true
   },
   ...[

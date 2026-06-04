@@ -17,7 +17,6 @@ export default function LobbyPage() {
   useEffect(() => {
     async function check() {
       if (playerId === null) {
-        // 尝试从本地恢复
         const restored = await restoreCurrentPlayerFromLocal();
         if (!restored) {
           router.push("/register");
@@ -27,15 +26,16 @@ export default function LobbyPage() {
     check();
   }, [playerId, router]);
 
-  if (!player || !snapshot) return <Layout title="加载中">正在读取身份...</Layout>;
+  if (!player || !snapshot) {
+    return <Layout title="加载中">正在读取身份...</Layout>;
+  }
 
   const completedCount = player.completedGames.length;
-  
-  // 获取最后完成的游戏的分数
   const lastResult = snapshot.results
     .slice()
     .sort((a, b) => new Date(b.completedAt).getTime() - new Date(a.completedAt).getTime())[0];
   const roundScore = lastResult?.score || 0;
+  const quizProgress = snapshot.quizProgress;
 
   return (
     <Layout title="活动大厅" eyebrow="LOBBY" rightSlot={<Link href="/ranking">排行</Link>}>
@@ -47,15 +47,41 @@ export default function LobbyPage() {
         </div>
         <strong>{completedCount}/4</strong>
       </section>
+
       <ScorePanel roundScore={roundScore} totalScore={player.totalScore} rank={snapshot.rank} />
       <div className="progressLine"><span style={{ width: `${(completedCount / 4) * 100}%` }} /></div>
+
       <section className="gameList">
         {snapshot.state.games.sort((a, b) => a.order - b.order).map((game) => {
           const isBingo = game.key === "bingo";
           const userBingoResult = isBingo
-            ? snapshot.results.find((r) => r.gameKey === "bingo")
+            ? snapshot.results.find((result) => result.gameKey === "bingo")
             : undefined;
           const bingoPending = Boolean(userBingoResult?.pendingBingoScore);
+
+          if (game.key === "quiz") {
+            const quizCompleted = quizProgress.completedCount >= quizProgress.totalCount;
+            const hasAvailableGroup = quizProgress.availableGroups.length > 0;
+            const quizStatus = quizCompleted
+              ? "已完成"
+              : !game.isOpen
+                ? "未开放"
+                : hasAvailableGroup
+                  ? "继续答题"
+                  : "等待开启";
+
+            return (
+              <GameCard
+                game={{ ...game, name: "Sector Quiz" }}
+                completed={quizCompleted}
+                key={game.key}
+                subtitle={`进度：${quizProgress.completedCount}/${quizProgress.totalCount}`}
+                statusOverride={quizStatus}
+                allowEnterOverride={game.isOpen && !quizCompleted}
+              />
+            );
+          }
+
           return (
             <GameCard
               game={game}

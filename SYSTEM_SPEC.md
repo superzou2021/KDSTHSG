@@ -1,156 +1,226 @@
-# 年会互动游戏系统 - 技术规范文档
+# 年会互动游戏系统 SPEC 3.0
+
+> 基于 2026-06-04 代码审查生成，反映系统当前真实状态。
+
+---
 
 ## 1. 系统概述
 
-### 1.1 项目背景
-本系统是一个年会互动游戏平台，支持手机扫码参与多种互动游戏，包含实时排行榜、大屏展示等功能。
+### 1.1 项目定位
+年会现场互动游戏系统，支持多用户手机端参与、后台实时控制、大屏实时展示。
 
 ### 1.2 技术栈
+| 层级 | 技术 | 版本 |
+|------|------|------|
+| 前端框架 | Next.js (App Router) | ^16.2.6 |
+| UI 框架 | React | ^19.2.6 |
+| 后端/数据库 | PocketBase | ^0.27.0 |
+| 样式 | CSS Variables + Tailwind CSS 4 | ^4.3.0 |
+| 语言 | TypeScript | ^6.0.3 |
+| 运行时 | Node.js | — |
 
-| 分类 | 技术 | 版本 | 说明 |
-|------|------|------|------|
-| 框架 | Next.js | 16.2.6 | React SSR 框架 |
-| 语言 | TypeScript | 6.0.3 | 类型安全 |
-| 样式 | Tailwind CSS | 4.3.0 | CSS 框架 |
-| 数据库 | PocketBase | 0.27.0 | 轻量后端服务 |
-
-### 1.3 核心特性
-
-- **扫码注册与账号恢复**：支持自动检测已注册用户，无需重复注册
-- **多游戏支持**：Bingo 猜词、Sector Quiz、真假故事、站立淘汰
-- **实时同步**：500ms 轮询间隔，确保状态实时更新
-- **大屏展示**：支持现场大屏实时展示排行榜和游戏状态
-- **后台控制**：游戏开关、Bingo 判分、Quiz 板块控制
+### 1.3 部署架构
+```
+手机浏览器 ──→ Next.js (localhost:3000) ──→ PocketBase (localhost:8090)
+大屏浏览器 ──→ Next.js                    ──→ PocketBase
+后台控制台 ──→ Next.js                    ──→ PocketBase
+```
+- Next.js 通过 `--hostname 0.0.0.0` 绑定所有网卡，局域网设备通过 IP 访问
+- PocketBase 通过 `--http 0.0.0.0:8090` 绑定所有网卡
+- `.env.local` 中 `NEXT_PUBLIC_POCKETBASE_URL` 配置 PocketBase 地址
 
 ---
 
-## 2. 架构设计
+## 2. 数据模型
 
-### 2.1 架构图
+### 2.1 核心类型定义（types/index.ts）
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                        前端层 (Next.js)                        │
-│  ┌─────────┐ ┌─────────┐ ┌─────────┐ ┌─────────┐ ┌─────────┐  │
-│  │ Register│ │  Lobby  │ │  Games  │ │ Ranking │ │  Admin  │  │
-│  └────┬────┘ └────┬────┘ └────┬────┘ └────┬────┘ └────┬────┘  │
-└───────┼───────────┼───────────┼───────────┼───────────┼───────┘
-        │           │           │           │           │
-        ▼           ▼           ▼           ▼           ▼
-┌─────────────────────────────────────────────────────────────────┐
-│                        Hooks 层                                │
-│         useCurrentPlayer | useGameStatus | useLobbySnapshot    │
-└──────────────────────────────┬──────────────────────────────────┘
-                               │
-                               ▼
-┌─────────────────────────────────────────────────────────────────┐
-│                        Storage 层                              │
-│              ┌───────────────┴───────────────┐                │
-│              ▼                               ▼                │
-│        storage.ts                        pb-storage.ts         │
-│    (统一接口)                         (PocketBase 实现)         │
-└──────────────────────────────┬──────────────────────────────────┘
-                               │
-                               ▼
-┌─────────────────────────────────────────────────────────────────┐
-│                    PocketBase / LocalStorage                   │
-└─────────────────────────────────────────────────────────────────┘
-```
-
-### 2.2 模块职责
-
-| 模块 | 职责 | 关键文件 |
-|------|------|----------|
-| **注册/恢复** | 用户注册、身份恢复 | `app/register/page.tsx` |
-| **活动大厅** | 游戏入口、进度展示 | `app/lobby/page.tsx` |
-| **游戏模块** | 4个游戏的核心逻辑 | `app/game/*/page.tsx` |
-| **排行榜** | 个人排行、Office 排行 | `app/ranking/page.tsx` |
-| **大屏展示** | 现场大屏输出 | `app/screen/page.tsx` |
-| **后台控制** | 游戏开关、判分控制 | `app/admin-control/page.tsx` |
-| **数据层** | 统一存储接口 | `lib/storage.ts` |
-| **PB 适配** | PocketBase 实现 | `lib/pb-storage.ts` |
-| **状态管理** | React Hooks | `hooks/use-game-data.ts` |
-
----
-
-## 3. 数据模型
-
-### 3.1 核心类型定义
-
+#### GameKey
 ```typescript
-// Player - 用户模型
-export type Player = {
-  id: string;                    // 用户唯一标识
-  name: string;                  // 姓名
-  phone: string;                 // 手机号（唯一）
-  office: string;                // Office（北京/上海/深圳/香港）
-  team: string;                  // Team（Alpha/Beta/Gamma/Delta）
-  totalScore: number;            // 总分
-  completedGames: GameKey[];     // 已完成游戏列表
-  finalSubmitted: boolean;       // 是否完成所有游戏
-  created: string;               // 创建时间
-  updated: string;               // 更新时间
-  finalCompletedAt?: string;     // 最终完成时间
-};
-
-// Game - 游戏配置
-export type Game = {
-  id: string;                    // 游戏唯一标识
-  key: GameKey;                  // 游戏标识
-  name: string;                  // 游戏名称
-  maxScore: number;              // 最高分
-  isOpen: boolean;               // 是否开放
-  order: number;                 // 排序顺序
-  bingoScored?: boolean;         // Bingo 是否已判分
-  quizCurrentGroup?: number;     // Quiz 当前板块（0-4）
-};
-
-// Question - 题目
-export type Question = {
-  id: string;                    // 题目ID
-  gameKey: GameKey;              // 所属游戏
-  type: "word" | "single" | "boolean" | "story";
-  title: string;                 // 题目内容
-  options?: string[];            // 选项（单选/故事题）
-  correctAnswer: string | string[]; // 正确答案
-  score: number;                 // 分值
-  order: number;                 // 排序
-  isActive: boolean;             // 是否启用
-};
-
-// GameResult - 游戏结果
-export type GameResult = {
-  id: string;                    // 结果ID
-  player: string;                // 玩家ID
-  gameKey: GameKey;              // 游戏标识
-  answers: Record<string, unknown>; // 答题记录
-  score: number;                 // 得分
-  maxScore: number;              // 最高分
-  completedAt: string;           // 完成时间
-  pendingBingoScore?: boolean;   // 是否待判分（仅 Bingo）
-};
-
-// GameKey - 游戏标识
-export type GameKey = "bingo" | "quiz" | "story" | "elimination";
+type GameKey = "bingo" | "quiz" | "story" | "elimination";
 ```
 
-### 3.2 localStorage Key 定义
+#### Player
+```typescript
+type Player = {
+  id: string;
+  name: string;
+  phone: string;          // 11位手机号，唯一标识
+  office: string;         // 北京/上海/深圳/香港
+  team: string;           // Alpha/Beta/Gamma/Delta
+  totalScore: number;     // 总分（满分400）
+  completedGames: GameKey[];  // 已完成的游戏列表
+  finalSubmitted: boolean;    // 所有4个游戏是否全部完成
+  created: string;
+  updated: string;
+  finalCompletedAt?: string; // 全部完成的时间戳
+};
+```
 
-| Key | 用途 | 说明 |
-|-----|------|------|
-| `annual_game_player_id_v2` | 当前玩家 ID | 用于快速查找 |
-| `annual_game_player_phone_v2` | 当前玩家手机号 | 用于账号恢复 |
-| `annual_game_player_cache_v2` | 当前玩家缓存 | JSON 格式 |
-| `annual_game_demo_state_v3` | 演示数据状态 | localStorage fallback 模式 |
+#### BingoPhase（Bingo 三阶段模型）
+```typescript
+type BingoPhase = "open" | "auto_score" | "closed";
+```
+| 阶段 | 含义 | 用户行为 |
+|------|------|---------|
+| `open` | 正常开放 | 提交后 pendingBingoScore=true，等待 Boss 判分 |
+| `auto_score` | Boss 发言完成 | 已等待用户统一判分；后续用户提交后立即自动判分 |
+| `closed` | 完全关闭 | 未完成用户不可再进入或提交 |
 
-### 3.3 游戏配置
+#### Game
+```typescript
+type Game = {
+  id: string;
+  key: GameKey;
+  name: string;
+  maxScore: number;           // 各游戏满分100
+  isOpen: boolean;            // 游戏是否开放
+  order: number;              // 显示顺序 1-4
+  bingoScored?: boolean;      // [仅bingo] Boss是否已判分（仅后台展示用）
+  bingoPhase?: BingoPhase;    // [仅bingo] 三阶段状态
+  quizCurrentGroup?: number;  // [仅quiz] 当前题组编号
+  quizOpenGroups?: number[];  // [仅quiz] 已开放的题组索引列表
+};
+```
 
-| 游戏 | Key | 名称 | 最高分 | 排序 |
-|------|-----|------|--------|------|
-| Bingo 猜词 | bingo | Bingo 猜词 | 100 | 1 |
-| Sector Quiz | quiz | Sector Quiz | 100 | 2 |
-| 真假故事 | story | 真假故事 | 100 | 3 |
-| 站立淘汰 | elimination | 站立淘汰 | 100 | 4 |
+#### Question
+```typescript
+type Question = {
+  id: string;
+  gameKey: GameKey;
+  type: "word" | "single" | "boolean" | "story";
+  title: string;
+  options?: string[];
+  correctAnswer: string | string[];
+  score: number;
+  order: number;
+  isActive: boolean;
+  sectorKey?: string;          // [仅quiz] 所属Sector标识
+  sectorName?: string;         // [仅quiz] Sector显示名
+  quizSessionIndex?: number;   // [仅quiz] 所属题组索引(0-4)
+};
+```
+
+#### GameResult
+```typescript
+type GameResult = {
+  id: string;
+  player: string;              // player.id
+  gameKey: GameKey;
+  answers: Record<string, unknown>;
+  score: number;
+  maxScore: number;
+  completedAt: string;
+  pendingBingoScore?: boolean; // [仅bingo] 是否等待Boss判分
+  quizSessionIndex?: number;   // [仅quiz] 题组索引
+  sectorKey?: string;
+  sectorName?: string;
+};
+```
+
+#### QuizProgress
+```typescript
+type QuizProgress = {
+  completedCount: number;      // 已完成题组数
+  totalCount: 5;               // 总题组数
+  score: number;               // Quiz累计得分
+  maxScore: 100;
+  openGroups: number[];        // 后台已开放的题组
+  availableGroups: number[];   // 可答题的题组（已开放且未完成）
+  completedGroups: number[];   // 已完成的题组
+};
+```
+
+### 2.2 PocketBase Collections
+
+| Collection | 字段 | 说明 |
+|------------|------|------|
+| `players` | name, phone, office, team, totalScore, completedGames(JSON), finalSubmitted, finalCompletedAt | 玩家信息 |
+| `games` | key, name, maxScore, isOpen, order, bingoScored, bingoPhase, quizCurrentGroup, quizOpenGroups(JSON) | 游戏配置 |
+| `game_results` | player, gameKey, answers(JSON), score, maxScore, completedAt, pendingBingoScore, quizSessionIndex, sectorKey, sectorName | 游戏结果 |
+| `questions` | gameKey, type, title, options(JSON), correctAnswer, score, order, isActive, sectorKey, sectorName, quizSessionIndex | 题目数据 |
+
+---
+
+## 3. 游戏流程
+
+### 3.1 游戏总览
+
+| # | 游戏 | 满分 | 题型 | 题数 | 特殊机制 |
+|---|------|------|------|------|---------|
+| 1 | Bingo 猜词 | 100 | 选词 | 30词选9 | 三阶段判分（open→auto_score→closed） |
+| 2 | Sector Quiz | 100 | 单选 | 10题(5组×2题) | 后台逐组开启，每组60秒倒计时 |
+| 3 | 真假故事 | 100 | 选择 | 2题 | 每题50分，从3个故事中选假故事 |
+| 4 | 站立淘汰 | 100 | 单选 | 5题 | 答错即淘汰，每题20分 |
+
+### 3.2 Bingo 猜词流程
+
+```
+用户进入 → 选择9个词 → 提交
+                              │
+              ┌───────────────┼───────────────┐
+              │ bingoPhase    │               │
+              ▼               ▼               ▼
+           open          auto_score       closed
+    pendingBingoScore   立即判分          禁止提交
+    =true              completedGames    显示"已结束"
+    显示等待Boss       +bingo
+    发言弹窗
+              │               │
+              ▼               │
+    后台点击"完成Boss ────────┘
+    发言并开启自动判分"
+    → 所有pending用户统一判分
+    → bingoPhase=auto_score
+```
+
+**核心原则**：用户是否完成Bingo，只看 `player.completedGames.includes("bingo")`，不用全局 `bingoScored` 或 `game.isOpen` 判断。
+
+### 3.3 Sector Quiz 流程
+
+```
+后台控制台：逐个开启 Sector 1-5
+                    │
+用户进入 Quiz 页面 → 看到5个Sector列表
+                    │
+    ┌───────────────┼───────────────┐
+    │ 已开放且未完成  │ 未开放        │ 已完成
+    ▼               ▼               ▼
+  "进入答题"      "等待主持人开启"  "已完成"
+    │
+    ▼
+  进入答题 → 2题/组 → 60秒倒计时
+    │
+    ├── 答完2题 → 提交 → 显示ResultModal
+    │
+    └── 倒计时结束 → 自动提交
+```
+
+**关键逻辑**：
+- `quizOpenGroups` 数组控制哪些Sector已开放
+- 用户按自己节奏答题，不强制同步后台当前组
+- 后台 `quizCurrentGroup` 仅记录已推进到第几组
+
+### 3.4 真假故事流程
+
+```
+用户进入 → 第1题（同事A的假故事）→ 选择 → 下一题
+         → 第2题（同事B的假故事）→ 选择 → 提交
+         → 显示ResultModal
+```
+
+- 2道题，每题50分，满分100
+- 从3个选项中选出假故事
+
+### 3.5 站立淘汰流程
+
+```
+用户进入 → 第1题 → 答对 → 下一题 → ... → 全部答对 → 完成
+                  → 答错 → 立即淘汰 → 提交结果 → 查看最终成绩
+```
+
+- 5题，每题20分，答错即淘汰
+- 淘汰后直接跳转最终成绩页
 
 ---
 
@@ -158,377 +228,535 @@ export type GameKey = "bingo" | "quiz" | "story" | "elimination";
 
 ### 4.1 页面路由
 
-| 路径 | 页面 | 功能 | 是否需要登录 |
-|------|------|------|--------------|
-| `/` | 首页 | 入口页面 | 否 |
-| `/register` | 注册页 | 用户注册/恢复 | 否 |
-| `/lobby` | 活动大厅 | 游戏选择、进度展示 | 是 |
-| `/game/bingo` | Bingo 猜词 | 选词游戏 | 是 |
-| `/game/quiz` | Sector Quiz | 分组答题 | 是 |
-| `/game/story` | 真假故事 | 真假判断 | 是 |
-| `/game/elimination` | 站立淘汰 | 答题淘汰 | 是 |
-| `/result` | 最终成绩 | 结算展示 | 是 |
-| `/ranking` | 排行榜 | 个人/Office 排行 | 是 |
-| `/screen` | 大屏展示 | 现场大屏 | 否 |
-| `/admin-control` | 后台控制 | 游戏管理 | 否（内部） |
+| 路由 | 页面 | 说明 |
+|------|------|------|
+| `/` | 首页 | Landing page，展示系统入口 |
+| `/register` | 注册页 | 手机号注册/恢复，隐藏左右按钮 |
+| `/lobby` | 活动大厅 | 游戏列表、进度、分数面板 |
+| `/game/bingo` | Bingo 猜词 | 选词、提交、等待/结果弹窗 |
+| `/game/quiz` | Sector Quiz | 5组答题、倒计时 |
+| `/game/story` | 真假故事 | 2道选择假故事题 |
+| `/game/elimination` | 站立淘汰 | 答错即淘汰 |
+| `/result` | 最终成绩 | 总分、排名、TOP10、地区统计 |
+| `/ranking` | 排行榜 | 用户排名置顶、TOP10、地区统计 |
+| `/screen` | 大屏展示 | 实时排行榜、3秒刷新 |
+| `/admin-control` | 后台控制台 | 游戏开关、Bingo控制、Quiz控制 |
 
-### 4.2 页面流程图
+### 4.2 页面详细说明
 
-```
-扫码 → /register 
-        │
-        ├─ 检查本地缓存 ──有──→ /lobby
-        │
-        └─ 注册表单 ──提交──→ /lobby
-                               │
-                               ├─ Bingo 猜词 ──完成──→ /lobby
-                               │
-                               ├─ Sector Quiz ──完成──→ /lobby
-                               │
-                               ├─ 真假故事 ──完成──→ /lobby
-                               │
-                               └─ 站立淘汰 ──完成──→ /result
-```
+#### /register（注册页）
+- 页面加载时先检查 localStorage 登录状态
+- 已注册用户自动跳转 `/lobby`
+- 手机号已存在时自动恢复用户（不报错）
+- 隐藏左上和右上导航按钮
 
----
+#### /lobby（活动大厅）
+- 顶部：用户信息 + 完成进度 (x/4)
+- ScorePanel：本轮得分、总分、排名
+- 进度条
+- 游戏卡片列表（4个游戏）
 
-## 5. 核心功能流程
+**GameCard 状态逻辑**：
 
-### 5.1 注册与账号恢复流程
-
-```
-用户扫码进入 /register
-        │
-        ▼
-┌─────────────────────┐
-│ 检查本地缓存状态    │
-│ (checking: true)    │
-└──────────┬──────────┘
-           │
-           ▼
-┌─────────────────────┐     有缓存且有效
-│ restoreCurrentPlayer│──────────────────────→ /lobby
-│ FromLocal()         │
-└──────────┬──────────┘
-           │ 无缓存或失效
-           ▼
-┌─────────────────────┐
-│ 显示注册表单        │
-│ (checking: false)   │
-└──────────┬──────────┘
-           │
-           ▼ 用户提交
-┌─────────────────────┐
-│ findPlayerByPhone() │─────已存在───→ 恢复用户 → /lobby
-└──────────┬──────────┘
-           │ 不存在
-           ▼
-┌─────────────────────┐
-│ registerPlayer()    │─────创建用户 → /lobby
-└─────────────────────┘
-```
-
-**关键方法说明：**
-
-| 方法 | 功能 | 参数 | 返回值 |
+| 游戏 | 条件 | 状态 | 可进入 |
 |------|------|------|--------|
-| `restoreCurrentPlayerFromLocal()` | 从本地恢复用户 | 无 | `Player \| null` |
-| `findPlayerByPhone(phone)` | 按手机号查找用户 | `phone: string` | `Player \| null` |
-| `saveCurrentPlayer(player)` | 保存当前用户到本地 | `player: Player` | `void` |
-| `clearCurrentPlayer()` | 清除本地用户缓存 | 无 | `void` |
+| Bingo | completedGames含bingo | 已完成 | 否 |
+| Bingo | pendingBingoScore=true | 等待Boss发言 | 是 |
+| Bingo | bingoPhase=open且isOpen | 未完成 | 是 |
+| Bingo | bingoPhase=auto_score | 未完成 | 是 |
+| Bingo | bingoPhase=closed | 已结束 | 否 |
+| Quiz | completedCount>=5 | 已完成 | 否 |
+| Quiz | availableGroups.length>0 | 继续答题 | 是 |
+| Quiz | 无可用题组 | 未开放 | 否 |
+| 其他 | completedGames含该key | 已完成 | 否 |
+| 其他 | isOpen=true | 未开始 | 是 |
+| 其他 | isOpen=false | 未开放 | 否 |
 
-### 5.2 Bingo 猜词游戏流程
+#### /game/bingo（Bingo 猜词）
+- 30个词库，选9个组成3×3宫格
+- `bingoPhase=open`：提交后 pendingBingoScore=true，显示 WaitingModal
+- `bingoPhase=auto_score`：顶部提示"Boss发言已完成"，提交后立即判分
+- `bingoPhase=closed`：未完成用户显示"Bingo已结束"
+- 已完成用户显示 ResultModal
+- 等待期间每秒轮询判分结果
 
-```
-进入页面 → 检查游戏状态
-              │
-              ├─ 游戏关闭 ──→ 显示"游戏加载中" + 返回大厅
-              │
-              └─ 游戏开放
-                    │
-                    ▼
-              选择9个词组成Bingo宫格
-                    │
-                    ▼
-              提交 Bingo
-                    │
-                    ▼
-              进入等待判分状态
-                    │
-                    ▼
-         后台触发 Bingo 判分
-                    │
-                    ▼
-              显示得分结果
-                    │
-                    ▼
-              返回大厅
-```
+#### /game/quiz（Sector Quiz）
+- 5个Sector列表，每个Sector含2题
+- 只有后台已开放的Sector才可进入
+- 进入后60秒倒计时，答完2题或倒计时结束自动提交
+- 每组提交后显示 ResultModal
+- 全部完成后显示 Quiz 总分
 
-### 5.3 Sector Quiz 游戏流程
+#### /game/story（真假故事）
+- 2道题，每题3个选项
+- 逐题作答，全部完成后提交
+- 每题50分
 
-```
-进入页面 → 开始对话框
-              │
-              ▼
-         第1组（2题，60秒）
-              │
-              ├─ 答完或超时
-              │
-              ▼
-         等待后台开启第2组
-              │
-              ├─ 后台点击"下一题组"
-              │
-              ▼
-         第2组（2题，60秒）...
-              │
-              ▼
-         第5组完成后提交成绩
-              │
-              ▼
-         显示得分结果 → 返回大厅
-```
+#### /game/elimination（站立淘汰）
+- 5道单选题
+- 答对进入下一题，答错立即淘汰
+- 淘汰后跳转最终成绩页
 
-**Quiz 配置：**
-- 每组题目数：2 题
-- 总组数：5 组
-- 每组时间：60 秒
-- 后台控制：管理员点击"下一题组"推进
+#### /result（最终成绩）
+- 顶部：总分 + 排名 + 用户信息
+- 未完成游戏提示
+- 距离TOP10差距
+- TOP10排行榜
+- 地区平均分
+- 各地区TOP3
 
----
+#### /ranking（排行榜）
+- 用户排名置顶（名字72px，名次72px）
+- TOP10排行榜
+- 地区平均分排名
+- 各地区TOP3
 
-## 6. 状态管理与同步
+#### /screen（大屏展示）
+- 3秒自动刷新
+- 实时排行榜TOP10
+- 地区平均分
+- 各地区TOP3
+- 背景色 #063125（与其他页面一致）
 
-### 6.1 实时同步机制
-
-```
-┌────────────────────────────────────────────────────────────────┐
-│                    状态刷新机制                                 │
-├────────────────────────────────────────────────────────────────┤
-│  轮询间隔：STATE_REFRESH_INTERVAL_MS = 500ms                  │
-│                                                               │
-│  useEffect(() => {                                            │
-│    refresh();                                                 │
-│    const timer = setInterval(refresh, 500);                   │
-│    return () => clearInterval(timer);                         │
-│  }, [refresh]);                                               │
-└────────────────────────────────────────────────────────────────┘
-```
-
-### 6.2 存储层设计
-
-**双层存储策略：**
-
-| 模式 | 数据源 | 优先级 | 适用场景 |
-|------|--------|--------|----------|
-| PocketBase | 远程数据库 | 高 | 正常运行环境 |
-| LocalStorage | 本地缓存 | 低 | PB 不可用时兜底 |
-
-**存储层核心方法：**
-
-| 方法 | 功能 | 双模式支持 |
-|------|------|------------|
-| `loadState()` | 加载完整状态 | ✅ |
-| `saveState(state)` | 保存状态 | ✅ |
-| `getCurrentPlayer()` | 获取当前用户 | ✅ |
-| `registerPlayer(input)` | 注册用户 | ✅ |
-| `submitGameResult(input)` | 提交游戏结果 | ✅ |
-| `isGameOpen(gameKey)` | 检查游戏状态 | ✅ |
-| `toggleGameOpen(gameKey)` | 切换游戏开关 | ✅ |
-| `triggerBingoScore()` | 触发 Bingo 判分 | ✅ |
-| `advanceQuizGroup()` | 推进 Quiz 板块 | ✅ |
+#### /admin-control（后台控制台）
+- 参与人数/结果记录/已完成统计
+- 游戏开关（4个游戏的开/关切换）
+- Bingo控制区：
+  - 当前阶段 + 完成/等待人数
+  - "完成Boss发言并开启自动判分"按钮
+  - "完全关闭Bingo"按钮
+- Sector Quiz控制区：
+  - 5个Sector，每个显示：状态 + 完成人数 + 题目列表 + 开启/关闭按钮
+- 数据导出：生成JSON / 重置DEMO数据
 
 ---
 
-## 7. 后台控制功能
+## 5. 模块架构
 
-### 7.1 后台控制面板
+### 5.1 文件结构
 
-| 功能模块 | 说明 | 操作按钮 |
-|----------|------|----------|
-| 游戏开关 | 控制4个游戏的开启/关闭 | 点击开启/点击关闭 |
-| Bingo 判分 | 对 Bingo 提交进行统一判分 | 触发判分 |
-| Sector Quiz | 控制 Quiz 板块推进 | 下一题组 |
-| 数据导出 | 导出当前状态 JSON | 生成 JSON |
-| 数据重置 | 重置演示数据 | 重置 DEMO 数据 |
+```
+f:\HS\
+├── app/
+│   ├── globals.css              # 全局样式（深绿色主题）
+│   ├── layout.tsx               # 根布局
+│   ├── page.tsx                 # 首页
+│   ├── register/page.tsx        # 注册页
+│   ├── lobby/page.tsx           # 活动大厅
+│   ├── game/
+│   │   ├── bingo/page.tsx       # Bingo 猜词
+│   │   ├── quiz/page.tsx        # Sector Quiz
+│   │   ├── story/page.tsx       # 真假故事
+│   │   └── elimination/page.tsx # 站立淘汰
+│   ├── result/page.tsx          # 最终成绩
+│   ├── ranking/page.tsx         # 排行榜
+│   ├── screen/page.tsx          # 大屏展示
+│   └── admin-control/page.tsx   # 后台控制台
+├── components/
+│   ├── Layout.tsx               # 页面布局（顶部导航）
+│   ├── GameCard.tsx             # 游戏卡片（状态判断）
+│   ├── ScorePanel.tsx           # 分数面板
+│   ├── ResultModal.tsx          # 结果弹窗
+│   ├── WaitingModal.tsx         # 等待弹窗
+│   ├── EliminationModal.tsx     # 淘汰弹窗
+│   ├── Countdown.tsx            # 倒计时组件
+│   ├── RankingTable.tsx         # 排行表格
+│   ├── OfficeAverageTable.tsx   # 地区平均分表格
+│   └── OfficeTop3Panel.tsx      # 地区TOP3面板
+├── hooks/
+│   └── use-game-data.ts         # 所有React Hooks
+├── lib/
+│   ├── constants.ts             # 常量、初始数据、题目
+│   ├── types/index.ts           # 类型定义（→ types/）
+│   ├── pocketbase.ts            # PocketBase客户端
+│   ├── pb-storage.ts            # PocketBase存储层（主）
+│   ├── storage.ts               # localStorage存储层（备用）
+│   ├── scoring.ts               # 评分计算
+│   ├── scoring.test.ts          # 评分测试
+│   ├── ranking.ts               # 排名计算
+│   └── game-state.ts            # 纯函数状态处理
+├── types/
+│   └── index.ts                 # 类型定义
+├── pocketbase.exe               # PocketBase可执行文件
+├── pb_data/                     # PocketBase数据目录
+├── scripts/                     # 辅助脚本
+├── .env.local                   # 环境变量
+└── next.config.js               # Next.js配置
+```
 
-### 7.2 状态监控
+### 5.2 模块职责
 
-| 监控项 | 说明 | 显示位置 |
-|--------|------|----------|
-| 参与人数 | 已注册玩家总数 | 顶部统计栏 |
-| 结果记录 | 游戏结果总数 | 顶部统计栏 |
-| 已完赛 | 完成全部4个游戏的人数 | 顶部统计栏 |
-| 游戏状态 | 各游戏开放/关闭状态 | 游戏开关列表 |
-| 当前板块 | Quiz 当前进行到第几板块 | Quiz 控制区 |
+| 模块 | 职责 | 关键文件 |
+|------|------|---------|
+| 类型系统 | 所有TypeScript类型定义 | `types/index.ts` |
+| 常量配置 | 游戏配置、题目数据、种子数据 | `lib/constants.ts` |
+| PocketBase存储 | 数据CRUD、业务逻辑 | `lib/pb-storage.ts` |
+| localStorage存储 | 离线备用方案 | `lib/storage.ts` |
+| 评分系统 | 各游戏分数计算 | `lib/scoring.ts` |
+| 排名系统 | 排行榜、地区统计 | `lib/ranking.ts` |
+| 状态处理 | 纯函数状态转换 | `lib/game-state.ts` |
+| React Hooks | 数据获取、状态管理 | `hooks/use-game-data.ts` |
+| 页面组件 | 各页面UI和交互 | `app/*/page.tsx` |
+| 通用组件 | 可复用UI组件 | `components/*.tsx` |
 
 ---
 
-## 8. 错误处理与容错
+## 6. 核心业务逻辑
 
-### 8.1 自动取消机制
+### 6.1 评分规则
 
-**问题**：PocketBase SDK 默认启用自动取消，导致并发请求冲突。
+| 游戏 | 计算函数 | 规则 |
+|------|---------|------|
+| Bingo | `calculateBingoScore(correctCount)` | 每个正确词10分，满分100 |
+| Quiz | `calculateQuizScore(correctCount)` | 每题10分，满分100 |
+| Story | `calculateStoryScore(results[])` | 每题50分，满分100 |
+| Elimination | `calculateEliminationScore(correctCount)` | 每题20分，满分100 |
 
-**解决方案**：在 `lib/pocketbase.ts` 中全局禁用自动取消：
+### 6.2 提交游戏结果（submitGameResult）
+
+```
+submitGameResult(input)
+│
+├── gameKey === "bingo"
+│   ├── 已完成 → 拒绝重复提交
+│   ├── 已有pending记录 → 拒绝重复提交
+│   ├── bingoPhase === "closed" → 拒绝提交
+│   ├── bingoPhase === "open" → pendingBingoScore=true，不更新player
+│   └── bingoPhase === "auto_score" → 立即判分，更新player
+│
+├── gameKey === "quiz"
+│   ├── 题组未开放 → 拒绝提交
+│   ├── 题组已完成 → 拒绝重复提交
+│   └── 正常提交 → 更新player
+│
+└── 其他游戏
+    ├── 游戏未开放 → 拒绝提交
+    ├── 已有结果 → 拒绝重复提交
+    └── 正常提交 → 更新player
+```
+
+### 6.3 Bingo 判分流程（triggerBingoScore / completeBossAndEnableAutoScore）
+
+```
+1. 找到所有 pendingBingoScore=true 的 Bingo 记录
+2. 将这些记录的 pendingBingoScore 设为 false
+3. 重新计算这些用户的 completedGames、totalScore、finalSubmitted
+4. 更新 Bingo game：bingoPhase="auto_score", isOpen=false
+5. 同步到 PocketBase
+```
+
+### 6.4 Quiz 题组管理
+
+```
+openQuizGroup(index)  → quizOpenGroups 增加 index，isOpen=true
+closeQuizGroup(index) → quizOpenGroups 移除 index，若为空则 isOpen=false
+```
+
+### 6.5 用户完成判断
 
 ```typescript
+// 判断用户是否完成某游戏
+function isGameCompleted(player: Player, gameKey: GameKey): boolean {
+  if (gameKey === "quiz") {
+    // Quiz需要5个题组全部完成
+    return completedQuizGroups.size >= 5;
+  }
+  return player.completedGames.includes(gameKey);
+}
+
+// 判断用户是否全部完成
+function isAllCompleted(player: Player): boolean {
+  return GAME_ORDER.every(key => player.completedGames.includes(key));
+}
+```
+
+---
+
+## 7. 数据同步机制
+
+### 7.1 前端轮询
+
+| Hook | 刷新间隔 | 用途 |
+|------|---------|------|
+| `useAppState` | 500ms | 全局状态刷新 |
+| `useCurrentPlayer` | 500ms | 当前用户信息 |
+| `useLobbySnapshot` | 500ms | 大厅数据 |
+| `useRanking` | 1500-3000ms | 排行榜数据 |
+| `useGameStatus` | 500ms | 游戏开放状态 |
+
+### 7.2 事件驱动
+
+```typescript
+// 状态变更时触发事件
+window.dispatchEvent(new Event("annual-game-state-change"));
+
+// subscribeToState 监听事件
+subscribeToState(callback);
+```
+
+### 7.3 PocketBase 自动取消
+
+```typescript
+// 全局禁用自动取消，避免轮询冲突
 pb.autoCancellation(false);
 ```
 
-### 8.2 网络容错
+### 7.4 后台操作后刷新
 
-| 场景 | 处理策略 | 代码位置 |
-|------|----------|----------|
-| PB 不可用 | 切换到 localStorage fallback | `storage.ts` |
-| 请求超时 | 重试 + 降级处理 | `pb-storage.ts` |
-| 数据不一致 | 优先使用 PB 数据 | `loadState()` |
-
-### 8.3 用户体验优化
-
-| 场景 | 用户提示 | 处理方式 |
-|------|----------|----------|
-| 游戏关闭 | "游戏加载中,请耐心等待" | 统一显示 |
-| 重复提交 | "该游戏已完成，不能重复提交" | 禁用提交按钮 |
-| 账号恢复 | "欢迎回来，正在进入大厅..." | 自动跳转 |
+```typescript
+// 后台操作后连续刷新3次，确保数据同步
+async function refreshMultiple(times = 3) {
+  for (let i = 0; i < times; i++) {
+    await refresh();
+    await new Promise(resolve => setTimeout(resolve, 200));
+  }
+}
+```
 
 ---
 
-## 9. 部署与配置
+## 8. 用户认证与恢复
 
-### 9.1 环境变量
+### 8.1 localStorage 键
 
-```env
-# .env.local
-NEXT_PUBLIC_POCKETBASE_URL=http://localhost:8090
+| Key | 用途 |
+|-----|------|
+| `annual_game_player_id_v2` | 当前用户ID |
+| `annual_game_player_phone_v2` | 当前用户手机号 |
+| `annual_game_player_cache_v2` | 用户信息缓存（JSON） |
+
+### 8.2 注册/恢复流程
+
+```
+用户扫码进入 /register
+│
+├── 检查 localStorage
+│   ├── 有 playerId → 查 PocketBase
+│   │   ├── 找到 → 自动跳转 /lobby
+│   │   └── 未找到 → 按 phone 查找
+│   │       ├── 找到 → 恢复 → 跳转 /lobby
+│   │       └── 未找到 → 清空缓存 → 显示注册表单
+│   └── 无 playerId → 显示注册表单
+│
+└── 填写手机号提交
+    ├── 手机号已存在 → 自动恢复 → 跳转 /lobby
+    └── 手机号不存在 → 创建新用户 → 跳转 /lobby
 ```
 
-### 9.2 启动方式
+### 8.3 兼容性
+
+- PocketBase 可用时：以 PocketBase 数据为准
+- PocketBase 不可用时：使用 localStorage 缓存兜底
+- 不因 PocketBase 短暂不可用就强制用户重新注册
+
+---
+
+## 9. 样式系统
+
+### 9.1 主题色
+
+| 变量 | 值 | 用途 |
+|------|-----|------|
+| `--green` | #00b86a | 主绿色 |
+| `--green-bright` | #40d88a | 亮绿色 |
+| `--gold` | #ffd060 | 金色（排名、分数） |
+| `--ink` | #ffffff | 主文字色 |
+| `--muted` | #a0b5a8 | 次要文字色 |
+| `--panel` | rgba(12,45,34,0.9) | 面板背景 |
+| `--border` | rgba(64,216,138,0.35) | 边框色 |
+| `--danger` | #ff5a5f | 危险/错误色 |
+
+### 9.2 背景色
+
+所有页面统一使用深绿色背景：
+```css
+background:
+  radial-gradient(ellipse at 50% 25%, rgba(64, 216, 138, 0.2), transparent 55%),
+  #063125;
+```
+
+### 9.3 字体
+
+| 变量 | 值 | 用途 |
+|------|-----|------|
+| `--mono` | SF Mono, Cascadia Code, Fira Code, Courier New, monospace | 数字、标签 |
+| `--sans` | PingFang SC, Microsoft YaHei UI, Segoe UI, sans-serif | 正文 |
+
+---
+
+## 10. 常量配置
+
+### 10.1 游戏配置
+
+```typescript
+const GAMES: Game[] = [
+  { id: "game-bingo", key: "bingo", name: "Bingo 猜词", maxScore: 100, isOpen: false, order: 1, bingoScored: false, bingoPhase: "open" },
+  { id: "game-quiz", key: "quiz", name: "Sector Quiz", maxScore: 100, isOpen: false, order: 2, quizCurrentGroup: 0, quizOpenGroups: [] },
+  { id: "game-story", key: "story", name: "真假故事", maxScore: 100, isOpen: false, order: 3 },
+  { id: "game-elimination", key: "elimination", name: "站立淘汰", maxScore: 100, isOpen: false, order: 4 }
+];
+```
+
+### 10.2 Office / Team
+
+```typescript
+const OFFICES = ["北京", "上海", "深圳", "香港"];
+const TEAMS = ["Alpha", "Beta", "Gamma", "Delta"];
+```
+
+### 10.3 Quiz 配置
+
+- 5个Sector，每个2题，每组60秒倒计时
+- Sector索引：0-4
+- 题组分配：`quizSessionIndex = Math.floor((order - 1) / 2)`
+
+---
+
+## 11. 旧数据兼容
+
+| 场景 | 处理方式 |
+|------|---------|
+| 旧数据无 `bingoPhase` | 根据 `bingoScored` 推断：true→auto_score，false→open |
+| 旧数据有 `bingoScored=true` | 映射为 `bingoPhase=auto_score`，但不判断所有用户已完成 |
+| 旧用户无 Bingo game_result | 视为未完成，auto_score阶段可进入并自动判分 |
+| 旧数据无 `quizOpenGroups` | 默认空数组 |
+| 旧数据无 `quizCurrentGroup` | 默认0 |
+
+---
+
+## 12. 环境变量
+
+| 变量 | 值 | 说明 |
+|------|-----|------|
+| `NEXT_PUBLIC_POCKETBASE_URL` | http://192.168.71.33:8090 | PocketBase地址 |
+
+---
+
+## 13. 关键设计决策
+
+### 13.1 Bingo 三阶段模型
+- **问题**：原来用全局 `bingoScored` 判断用户是否完成，导致Boss判分后所有用户都显示已完成
+- **解决**：引入 `bingoPhase` 三阶段模型，用户完成状态只看 `completedGames`
+
+### 13.2 Quiz 独立进度
+- **问题**：新用户进入时直接跳到后台当前题组
+- **解决**：用户按自己节奏答题，后台 `quizOpenGroups` 仅控制哪些组可进入
+
+### 13.3 PocketBase 自动取消
+- **问题**：轮询导致请求被自动取消
+- **解决**：全局禁用 `pb.autoCancellation(false)`
+
+### 13.4 双存储层
+- `pb-storage.ts`：PocketBase模式（主）
+- `storage.ts`：localStorage模式（备用）
+- `storage.ts` 作为统一入口，自动检测 PocketBase 可用性并分发
+
+### 13.5 Sector Quiz 大厅控制
+- **问题**：用户在后台未开放Sector时也能进入Quiz页面
+- **解决**：大厅 GameCard 根据 `availableGroups` 判断是否可进入，无可用组时显示"未开放"且不可点击
+
+---
+
+## 14. API 函数索引
+
+### 14.1 存储层（pb-storage.ts / storage.ts）
+
+| 函数 | 说明 |
+|------|------|
+| `checkPocketBase()` | 检查 PocketBase 是否可用 |
+| `ensureGameState()` | 确保 PocketBase 中游戏数据完整 |
+| `ensureCollections()` | 确保 PocketBase collections 存在 |
+| `loadState()` | 加载完整应用状态 |
+| `getCurrentPlayerId()` | 获取当前用户ID |
+| `getCurrentPlayer()` | 获取当前用户信息 |
+| `saveCurrentPlayer(player)` | 保存当前用户到 localStorage |
+| `clearCurrentPlayer()` | 清除当前用户缓存 |
+| `findPlayerByPhone(phone)` | 按手机号查找用户 |
+| `restoreCurrentPlayerFromLocal()` | 从 localStorage 恢复用户 |
+| `registerPlayer(input)` | 注册/恢复用户 |
+| `validatePhone(phone)` | 验证手机号格式 |
+| `getGameResult(playerId, gameKey)` | 获取游戏结果 |
+| `isGameOpen(gameKey)` | 检查游戏是否开放 |
+| `toggleGameOpen(gameKey)` | 切换游戏开放状态 |
+| `triggerBingoScore()` | 完成Boss发言并开启自动判分 |
+| `closeBingoGame()` | 完全关闭Bingo |
+| `advanceQuizGroup()` | 推进Quiz题组 |
+| `openQuizGroup(index)` | 开启指定Quiz题组 |
+| `closeQuizGroup(index)` | 关闭指定Quiz题组 |
+| `submitGameResult(input)` | 提交游戏结果 |
+| `getLobbySnapshot(playerId)` | 获取大厅快照 |
+| `getRankingSnapshot(playerId)` | 获取排行榜快照 |
+| `resetDemoData()` | 重置演示数据 |
+
+### 14.2 评分函数（scoring.ts）
+
+| 函数 | 说明 |
+|------|------|
+| `calculateBingoScore(correctCount)` | Bingo评分：每词10分 |
+| `calculateQuizScore(correctCount)` | Quiz评分：每题10分 |
+| `calculateStoryScore(results[])` | Story评分：每题50分 |
+| `calculateEliminationScore(correctCount)` | Elimination评分：每题20分 |
+
+### 14.3 排名函数（ranking.ts）
+
+| 函数 | 说明 |
+|------|------|
+| `buildRanking(players)` | 构建完整排名 |
+| `getTop10Ranking(players)` | TOP10排名 |
+| `getPlayerRank(players, playerId)` | 用户排名 |
+| `getOfficeAverageRanking(players)` | 地区平均分排名 |
+| `getOfficeTop3(players)` | 各地区TOP3 |
+| `getPlayerRankingContext(players, playerId)` | 用户排名上下文 |
+
+### 14.4 React Hooks（use-game-data.ts）
+
+| Hook | 说明 |
+|------|------|
+| `useAppState()` | 全局应用状态（500ms刷新） |
+| `useCurrentPlayer()` | 当前用户信息（500ms刷新） |
+| `useRegisterPlayer()` | 注册函数 |
+| `useQuestions(gameKey)` | 题目列表 |
+| `useGameStatus(gameKey)` | 游戏开放状态（500ms刷新） |
+| `useSubmitGameResult()` | 提交游戏结果函数 |
+| `useExistingResult(playerId, gameKey)` | 是否已有游戏结果 |
+| `useLobbySnapshot(playerId)` | 大厅快照（500ms刷新） |
+| `useRanking(playerId, intervalMs)` | 排行榜数据 |
+| `useAdminActions()` | 后台操作函数集合 |
+
+---
+
+## 15. 测试
+
+### 15.1 测试命令
+```bash
+npm test
+# 运行 lib/scoring.test.ts, lib/business.test.ts, lib/integration.test.ts
+```
+
+### 15.2 构建命令
+```bash
+npm run build
+# TypeScript 类型检查 + Next.js 生产构建
+```
+
+---
+
+## 16. 启动流程
 
 ```bash
-# 开发模式
+# 1. 启动 PocketBase
+.\pocketbase.exe serve --http 0.0.0.0:8090
+
+# 2. 启动 Next.js
 npm run dev
 
-# 生产构建
-npm run build
-
-# 启动生产服务
-npm run start
-
-# 启动 PocketBase（Windows）
-.\QUICK_START_POCKETBASE.ps1
-```
-
-### 9.3 PocketBase 配置
-
-**集合结构**：
-
-| 集合名 | 用途 | 对应类型 |
-|--------|------|----------|
-| `players` | 用户数据 | Player |
-| `games` | 游戏配置 | Game |
-| `questions` | 题目数据 | Question |
-| `game_results` | 游戏结果 | GameResult |
-
----
-
-## 10. 安全注意事项
-
-### 10.1 数据校验
-
-| 校验项 | 规则 | 位置 |
-|--------|------|------|
-| 手机号格式 | 11位数字，以1开头 | `validatePhone()` |
-| 姓名过滤 | 移除 `<>` 特殊字符 | `registerPlayer()` |
-| Team 过滤 | 移除 `<>` 特殊字符 | `registerPlayer()` |
-
-### 10.2 权限控制
-
-- **前端**：无敏感操作权限，仅展示和提交
-- **后台**：通过独立路由 `/admin-control` 访问，建议内网访问
-
----
-
-## 11. 验收标准
-
-### 11.1 注册与恢复
-
-| 场景 | 预期行为 |
-|------|----------|
-| 首次扫码 | 显示注册表单，注册成功后进入大厅 |
-| 关闭浏览器再扫码 | 自动恢复身份，直接进入大厅 |
-| 清缓存再扫码 | 显示注册表单 |
-| 输入已注册手机号 | 显示"欢迎回来"，恢复身份并进入大厅 |
-| 输入新手机号 | 创建新用户并进入大厅 |
-| PB 不可用但有缓存 | 可进入大厅（使用本地缓存） |
-| `/lobby` 无用户状态 | 自动跳回 `/register` |
-
-### 11.2 游戏功能
-
-| 游戏 | 验收要点 |
-|------|----------|
-| Bingo | 选词9个 → 提交 → 等待判分 → 显示结果 |
-| Quiz | 分组答题（5组×2题）→ 每组60秒 → 后台控制推进 |
-| Story | 3题真假判断 → 提交得分 |
-| Elimination | 5题单选 → 提交得分 |
-
-### 11.3 后台控制
-
-| 功能 | 验收要点 |
-|------|----------|
-| 游戏开关 | 开启/关闭游戏，前端实时响应 |
-| Bingo 判分 | 触发后关闭游戏，计算所有提交的得分 |
-| Quiz 板块 | 点击"下一题组"推进到下一组 |
-
----
-
-## 12. 项目文件结构
-
-```
-f:\HS/
-├── app/                          # Next.js 页面
-│   ├── admin-control/page.tsx    # 后台控制面板
-│   ├── game/                     # 游戏页面
-│   │   ├── bingo/page.tsx        # Bingo 猜词
-│   │   ├── elimination/page.tsx  # 站立淘汰
-│   │   ├── quiz/page.tsx         # Sector Quiz
-│   │   └── story/page.tsx        # 真假故事
-│   ├── lobby/page.tsx            # 活动大厅
-│   ├── ranking/page.tsx          # 排行榜
-│   ├── register/page.tsx         # 注册页面
-│   ├── result/page.tsx           # 最终成绩
-│   ├── screen/page.tsx           # 大屏展示
-│   ├── globals.css               # 全局样式
-│   └── layout.jsx                # 布局组件
-├── components/                   # React 组件
-│   ├── Countdown.tsx             # 倒计时组件
-│   ├── GameCard.tsx              # 游戏卡片
-│   ├── Layout.tsx                # 布局容器
-│   ├── QuizStartModal.tsx        # Quiz 开始对话框
-│   ├── ResultModal.tsx           # 结果对话框
-│   ├── ScorePanel.tsx            # 分数面板
-│   └── WaitingModal.tsx          # 等待对话框
-├── hooks/                        # React Hooks
-│   └── use-game-data.ts          # 游戏数据相关 Hooks
-├── lib/                          # 工具库
-│   ├── constants.ts              # 常量定义
-│   ├── game-state.ts             # 游戏状态处理
-│   ├── pb-storage.ts             # PocketBase 存储实现
-│   ├── pocketbase.ts             # PocketBase 客户端配置
-│   ├── ranking.ts                # 排行榜计算
-│   ├── scoring.ts                # 得分计算
-│   └── storage.ts                # 统一存储接口
-├── pb_migrations/                # PocketBase 迁移脚本
-├── types/                        # TypeScript 类型定义
-│   └── index.ts                  # 核心类型
-├── package.json                  # 项目配置
-├── tsconfig.json                 # TypeScript 配置
-└── tailwind.config.ts            # Tailwind 配置
+# 3. 访问
+# 主应用：http://localhost:3000
+# 大屏：http://localhost:3000/screen
+# 后台：http://localhost:3000/admin-control
+# PocketBase管理：http://localhost:8090/_/
 ```
 
 ---
 
-**文档版本**: v1.0  
-**生成日期**: 2026-06-04  
-**适用项目**: alpha-matrix-h5
+*文档版本：3.0 | 生成时间：2026-06-04 | 基于代码审查自动生成*

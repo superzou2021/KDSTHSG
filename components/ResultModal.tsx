@@ -9,10 +9,13 @@ type ResultModalProps = {
   onBackLobby: () => void;
   buttonText?: string;
   isEliminated?: boolean;
+  onClose?: () => void;
 };
 
-export default function ResultModal({ open, gameName, roundScore, totalScore, rank, onBackLobby, buttonText, isEliminated = false }: ResultModalProps) {
+export default function ResultModal({ open, gameName, roundScore, totalScore, rank, onBackLobby, buttonText, isEliminated = false, onClose }: ResultModalProps) {
   if (!open) return null;
+
+  const handleClick = onClose || onBackLobby;
 
   return (
     <div className="modalMask">
@@ -32,7 +35,7 @@ export default function ResultModal({ open, gameName, roundScore, totalScore, ra
         <div className="modalScore">{roundScore}</div>
         <p>累计积分 {totalScore}，当前排名 #{rank || "-"}</p>
         <div className="modalActions single">
-          <button className="primaryButton" type="button" onClick={onBackLobby}>
+          <button className="primaryButton" type="button" onClick={handleClick}>
             {buttonText || "回到大厅"}
           </button>
         </div>

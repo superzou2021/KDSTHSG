@@ -109,7 +109,7 @@ test("集成测试: 多人游戏排名流程", () => {
   // 2. 验证各玩家得分
   assert.equal(players[0].totalScore, 400); // 100+100+100+100
   assert.equal(players[1].totalScore, 400); // 100+100+100+100
-  assert.equal(players[2].totalScore, 240); // 80+70+30+60
+  assert.equal(players[2].totalScore, 260); // 80+70+50+60
 
   // 3. 生成排名
   const ranking = buildRanking(players);
@@ -133,7 +133,7 @@ test("集成测试: 多人游戏排名流程", () => {
   assert.equal(officeAverages[0].office, "北京");
   assert.equal(officeAverages[0].averageScore, 400); // (400+400)/2
   assert.equal(officeAverages[1].office, "上海");
-  assert.equal(officeAverages[1].averageScore, 240);
+  assert.equal(officeAverages[1].averageScore, 260);
 
   // 7. 验证 Office Top 3
   const officeTop3 = getOfficeTop3(players);
