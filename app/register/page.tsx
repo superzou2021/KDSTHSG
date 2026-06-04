@@ -81,7 +81,7 @@ export default function RegisterPage() {
   // 检查期间显示 loading，不要闪注册表单
   if (checking) {
     return (
-      <Layout title="入场登记" eyebrow="REGISTER">
+      <Layout title="入场登记" eyebrow="REGISTER" hideLeftButton={true} rightSlot={<div></div>}>
         <div style={{ textAlign: 'center', padding: '60px 0' }}>
           <div style={{ fontSize: '48px', marginBottom: '16px' }}>⏳</div>
           <p style={{ color: 'var(--muted)', fontSize: '16px' }}>正在检查登录状态...</p>
@@ -91,7 +91,7 @@ export default function RegisterPage() {
   }
 
   return (
-    <Layout title="入场登记" eyebrow="REGISTER">
+    <Layout title="入场登记" eyebrow="REGISTER" hideLeftButton={true} rightSlot={<div></div>}>
       <form className="demoForm" onSubmit={handleSubmit}>
         <label>
           <span>姓名</span>

@@ -6,19 +6,24 @@ type LayoutProps = {
   eyebrow?: string;
   children: ReactNode;
   rightSlot?: ReactNode;
+  hideLeftButton?: boolean;
 };
 
-export default function Layout({ title, eyebrow = "ANNUAL GAME", children, rightSlot }: LayoutProps) {
+export default function Layout({ title, eyebrow = "ANNUAL GAME", children, rightSlot, hideLeftButton = false }: LayoutProps) {
   return (
     <main className="mobilePage">
       <header className="topNav" style={{ alignItems: 'center', paddingBottom: '16px' }}>
-        <Link href="/lobby" className="brandLink" style={{ textDecoration: 'none' }}>
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--ink)" strokeWidth="2">
-            <line x1="3" y1="12" x2="21" y2="12" />
-            <line x1="3" y1="6" x2="21" y2="6" />
-            <line x1="3" y1="18" x2="21" y2="18" />
-          </svg>
-        </Link>
+        {!hideLeftButton ? (
+          <Link href="/lobby" className="brandLink" style={{ textDecoration: 'none' }}>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--ink)" strokeWidth="2">
+              <line x1="3" y1="12" x2="21" y2="12" />
+              <line x1="3" y1="6" x2="21" y2="6" />
+              <line x1="3" y1="18" x2="21" y2="18" />
+            </svg>
+          </Link>
+        ) : (
+          <div style={{ width: '20px' }}></div>
+        )}
         <div style={{ flex: 1, textAlign: 'center' }}>
           <h1 style={{ fontSize: '18px', margin: 0, fontWeight: 'bold' }}>{title}</h1>
         </div>
