@@ -2,10 +2,10 @@ export default function Home() {
   return (
     <main className="landingPage">
       <section className="landingHero">
-        <div className="heroMark">AM</div>
+        <div className="heroMark">HSG</div>
         <span className="eyebrow">ANNUAL GAME DEMO</span>
         <h1>
-          Alpha Matrix
+          HSG
           <span>年会互动游戏系统</span>
         </h1>
         <p>手机端四关游戏、自动判分、防重复提交、实时排行榜、大屏和简易后台控制闭环演示。</p>

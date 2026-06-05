@@ -35,11 +35,6 @@ export default function ResultPage() {
     return (
       <Layout title="最终成绩" eyebrow="RESULT">
         <section className="statusBanner">{isLoading ? "正在读取成绩..." : "未找到当前用户，请重新注册。"}</section>
-        {!isLoading && (
-          <div className="pageActions">
-            <Link className="primaryButton" href="/register">返回注册</Link>
-          </div>
-        )}
       </Layout>
     );
   }

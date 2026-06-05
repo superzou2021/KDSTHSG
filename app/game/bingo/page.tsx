@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Layout from "@/components/Layout";
 import ResultModal from "@/components/ResultModal";
 import WaitingModal from "@/components/WaitingModal";
@@ -24,6 +24,9 @@ export default function BingoPage() {
   const [pendingResult, setPendingResult] = useState<Awaited<ReturnType<typeof submitGameResult>> | null>(null);
   const [isLeaving, setIsLeaving] = useState(false);
   const [message, setMessage] = useState("");
+  const [hideHeader, setHideHeader] = useState(false);
+  const lastScrollY = useRef(0);
+  const touchStartY = useRef(0);
 
   // Bingo 阶段
   const bingoGame = useMemo(() => state.games.find((g) => g.key === "bingo"), [state.games]);
@@ -48,6 +51,48 @@ export default function BingoPage() {
   useEffect(() => {
     if (playerId === null) router.push("/register");
   }, [playerId, router]);
+
+  // 监听滚动和触摸事件来隐藏/显示头部
+  useEffect(() => {
+    const handleScroll = () => {
+      const currentScrollY = window.scrollY;
+      if (currentScrollY > lastScrollY.current + 20) {
+        // 上滑超过20px，隐藏头部
+        setHideHeader(true);
+      } else if (currentScrollY < lastScrollY.current - 20) {
+        // 下滑超过20px，显示头部
+        setHideHeader(false);
+      }
+      lastScrollY.current = currentScrollY;
+    };
+
+    const handleTouchStart = (e: TouchEvent) => {
+      touchStartY.current = e.touches[0].clientY;
+    };
+
+    const handleTouchMove = (e: TouchEvent) => {
+      const currentTouchY = e.touches[0].clientY;
+      const diff = touchStartY.current - currentTouchY;
+      
+      if (diff > 30) {
+        // 上滑超过30px，隐藏头部
+        setHideHeader(true);
+      } else if (diff < -30) {
+        // 下滑超过30px，显示头部
+        setHideHeader(false);
+      }
+    };
+
+    window.addEventListener("scroll", handleScroll);
+    window.addEventListener("touchstart", handleTouchStart);
+    window.addEventListener("touchmove", handleTouchMove);
+
+    return () => {
+      window.removeEventListener("scroll", handleScroll);
+      window.removeEventListener("touchstart", handleTouchStart);
+      window.removeEventListener("touchmove", handleTouchMove);
+    };
+  }, []);
 
   useEffect(() => {
     if (!playerId) {
@@ -124,7 +169,7 @@ export default function BingoPage() {
 
   if (isLeaving) {
     return (
-      <Layout title="Bingo 猜词" eyebrow="GAME 01">
+      <Layout title="Bingo 猜词" eyebrow="GAME 01" hideHeader={hideHeader}>
         <section className="statusBanner">正在跳转...</section>
       </Layout>
     );
@@ -133,7 +178,7 @@ export default function BingoPage() {
   // bingoPhase === closed 且用户未完成：禁止进入
   if (bingoPhase === "closed" && !hasCompletedBingo && !isWaitingForScore) {
     return (
-      <Layout title="Bingo 猜词" eyebrow="GAME 01">
+      <Layout title="Bingo 猜词" eyebrow="GAME 01" hideHeader={hideHeader}>
         <section className="statusBanner">Bingo 已结束</section>
         <button className="primaryButton" type="button" onClick={goLobby}>
           回到大厅
@@ -145,7 +190,7 @@ export default function BingoPage() {
   // 等待数据加载中
   if (existingLoading) {
     return (
-      <Layout title="Bingo 猜词" eyebrow="GAME 01">
+      <Layout title="Bingo 猜词" eyebrow="GAME 01" hideHeader={hideHeader}>
         <section className="statusBanner">游戏加载中,请耐心等待</section>
       </Layout>
     );
@@ -189,7 +234,7 @@ export default function BingoPage() {
   }
 
   return (
-    <Layout title="Bingo 猜词" eyebrow="GAME 01">
+    <Layout title="Bingo 猜词" eyebrow="GAME 01" hideHeader={hideHeader}>
       <div style={{ textAlign: "center", marginBottom: "24px" }}>
         <div style={{ fontSize: "64px", marginBottom: "8px" }}>🎯</div>
         <h2
