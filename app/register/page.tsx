@@ -61,7 +61,6 @@ export default function RegisterPage() {
     setOfficeOpen(false);
   }
 
-  // 点击外部关闭下拉菜单
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
       if (officeDropdownRef.current && !officeDropdownRef.current.contains(event.target as Node)) {
@@ -108,15 +107,24 @@ export default function RegisterPage() {
   if (checking) {
     return (
       <Layout title="入场登记" eyebrow="REGISTER" hideLeftButton rightSlot={<div />} hideHeader>
-        <section className="registerShell">
-          <div className="registerCard checkingCard">
-            <div className="hongshanLogo">
-              <span>HS</span>
-              <b>HongShan</b>
-            </div>
-            <p className="restoreMessage">欢迎回来，正在恢复您的参赛信息...</p>
+        <div style={{
+          minHeight: "100vh",
+          background: "linear-gradient(180deg, #00523E 0%, #00B88B 100%)",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center"
+        }}>
+          <div style={{ textAlign: "center" }}>
+            <div style={{
+              width: "100px",
+              height: "33px",
+              background: "rgba(255,255,255,0.2)",
+              borderRadius: "4px",
+              marginBottom: "20px"
+            }} />
+            <p style={{ color: "white", fontSize: "16px" }}>欢迎回来，正在恢复您的参赛信息...</p>
           </div>
-        </section>
+        </div>
       </Layout>
     );
   }
@@ -124,245 +132,241 @@ export default function RegisterPage() {
   return (
     <Layout title="入场登记" eyebrow="REGISTER" hideLeftButton rightSlot={<div />} hideHeader>
       <div style={{
-        minHeight: "100vh",
-        background: "linear-gradient(180deg, #005a2c 0%, #003d1e 100%)",
-        padding: "80px 20px 40px",
+        width: "100%",
+        height: "100vh",
         position: "relative",
+        background: "linear-gradient(180deg, #00523E 0%, #00B88B 100%)",
         overflow: "hidden"
       }}>
-        {/* 装饰性线条 */}
+        {/* 状态栏区域 */}
         <div style={{
+          width: "100%",
+          height: "44px",
           position: "absolute",
-          top: "60px",
           left: "0",
-          right: "0",
-          height: "2px",
-          background: "linear-gradient(90deg, transparent, rgba(64,216,138,0.5), transparent)"
-        }} />
-        <div style={{
-          position: "absolute",
-          top: "180px",
-          left: "0",
-          right: "0",
-          height: "1px",
-          background: "linear-gradient(90deg, transparent, rgba(64,216,138,0.3), transparent)"
-        }} />
-
-        {/* Logo */}
-        <div style={{ marginBottom: "40px" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-            <span style={{
-              fontSize: "24px",
-              fontWeight: "bold",
-              color: "white",
-              letterSpacing: "2px"
-            }}>HONGSHAN</span>
-            <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
-              <path d="M8 8h16v8h-8v8H8V8z" fill="rgba(64,216,138,0.8)" />
-              <path d="M12 4h16v8h-8v8h-8V4z" fill="rgba(64,216,138,0.5)" />
-              <path d="M16 0h16v8h-8v8h-8V0z" fill="rgba(64,216,138,0.3)" />
-            </svg>
+          top: "0",
+          backdropFilter: "blur(10px)"
+        }}>
+          <div style={{ width: "54px", height: "21px", left: "21px", top: "7px", position: "absolute" }}>
+            <div style={{ width: "54px", left: "0px", top: "6px", position: "absolute", textAlign: "center", color: "white", fontSize: "15px", fontFamily: "Roboto", fontWeight: 500, lineHeight: "20px", wordWrap: "break-word" }}>9:41</div>
           </div>
-          <div style={{
-            fontSize: "14px",
-            color: "rgba(255,255,255,0.7)",
-            marginTop: "4px"
-          }}>红杉中国</div>
+          <div style={{ width: "22px", height: "11px", left: "326px", top: "17px", position: "absolute", opacity: 0.35, borderRadius: "2.67px", border: "1px white solid" }} />
+          <div style={{ width: "18px", height: "7px", left: "328px", top: "19px", position: "absolute", background: "white", borderRadius: "1.33px" }} />
+          <div style={{ width: "1.33px", height: "4px", left: "349.33px", top: "21px", position: "absolute", opacity: 0.40, background: "white" }} />
         </div>
 
-        {/* 表单 */}
-        <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: "24px" }}>
-          {/* 姓名 */}
-          <div>
-            <label style={{
-              display: "block",
-              color: "white",
-              fontSize: "18px",
-              fontWeight: "500",
-              marginBottom: "12px"
-            }}>姓名</label>
+        {/* Logo */}
+        <img 
+          src="https://placehold.co/100x33" 
+          style={{ width: "100px", height: "33px", left: "37px", top: "108px", position: "absolute" }} 
+          alt="Logo"
+        />
+
+        {/* 姓名标签 */}
+        <div style={{ left: "37px", top: "160px", position: "absolute", color: "white", fontSize: "14px", fontFamily: "Source Han Sans CN", fontWeight: 500, lineHeight: "20px", wordWrap: "break-word" }}>姓名</div>
+        {/* 姓名输入框 */}
+        <input
+          value={form.name}
+          maxLength={16}
+          placeholder=""
+          onChange={(event) => updateField("name", event.target.value)}
+          style={{
+            width: "301px",
+            height: "48px",
+            left: "37px",
+            top: "186px",
+            position: "absolute",
+            background: "rgba(255, 255, 255, 0.10)",
+            borderRadius: "2px",
+            border: "0.50px white solid",
+            color: "white",
+            fontSize: "14px",
+            fontFamily: "Source Han Sans CN",
+            fontWeight: 400,
+            lineHeight: "20px",
+            padding: "0 12px",
+            outline: "none"
+          }}
+        />
+
+        {/* 手机号标签 */}
+        <div style={{ left: "37px", top: "250px", position: "absolute", color: "white", fontSize: "14px", fontFamily: "Source Han Sans CN", fontWeight: 500, lineHeight: "20px", wordWrap: "break-word" }}>手机号</div>
+        {/* 手机号输入框 */}
+        <input
+          value={form.phone}
+          inputMode="tel"
+          maxLength={11}
+          placeholder=""
+          onChange={(event) => updateField("phone", event.target.value)}
+          style={{
+            width: "301px",
+            height: "48px",
+            left: "37px",
+            top: "276px",
+            position: "absolute",
+            background: "rgba(255, 255, 255, 0.10)",
+            borderRadius: "2px",
+            border: "0.50px white solid",
+            color: "white",
+            fontSize: "14px",
+            fontFamily: "Source Han Sans CN",
+            fontWeight: 400,
+            lineHeight: "20px",
+            padding: "0 12px",
+            outline: "none"
+          }}
+        />
+
+        {/* Office标签 */}
+        <div style={{ left: "37px", top: "340px", position: "absolute", color: "white", fontSize: "14px", fontFamily: "Source Han Sans CN", fontWeight: 500, lineHeight: "20px", wordWrap: "break-word" }}>Office</div>
+        {/* Office下拉框 */}
+        <div style={{ position: "relative" }} ref={officeDropdownRef}>
+          <div style={{
+            width: "301px",
+            height: "48px",
+            left: "37px",
+            top: "366px",
+            position: "absolute",
+            background: "rgba(255, 255, 255, 0.10)",
+            borderRadius: "2px",
+            border: "0.50px white solid"
+          }}>
             <input
-              value={form.name}
-              maxLength={16}
-              placeholder="请输入姓名"
-              onChange={(event) => updateField("name", event.target.value)}
+              value={officeQuery}
+              placeholder=""
+              autoComplete="off"
+              onFocus={() => setOfficeOpen(!officeOpen)}
+              onMouseDown={(e) => {
+                e.preventDefault();
+                setOfficeOpen(!officeOpen);
+              }}
+              onChange={(event) => {
+                const value = event.target.value;
+                setOfficeQuery(value);
+                updateField("office", OFFICES.includes(value) ? value : "");
+                setOfficeOpen(true);
+              }}
               style={{
                 width: "100%",
-                padding: "16px 16px",
-                fontSize: "18px",
-                background: "rgba(255,255,255,0.08)",
-                border: "1px solid rgba(255,255,255,0.3)",
-                borderRadius: "4px",
-                color: "white",
-                outline: "none"
-              }}
-            />
-          </div>
-
-          {/* 手机号 */}
-          <div>
-            <label style={{
-              display: "block",
-              color: "white",
-              fontSize: "18px",
-              fontWeight: "500",
-              marginBottom: "12px"
-            }}>手机号</label>
-            <input
-              value={form.phone}
-              inputMode="tel"
-              maxLength={11}
-              placeholder="请输入手机号"
-              onChange={(event) => updateField("phone", event.target.value)}
-              style={{
-                width: "100%",
-                padding: "16px 16px",
-                fontSize: "18px",
-                background: "rgba(255,255,255,0.08)",
-                border: "1px solid rgba(255,255,255,0.3)",
-                borderRadius: "4px",
-                color: "white",
-                outline: "none"
-              }}
-            />
-          </div>
-
-          {/* Office */}
-          <div style={{ position: "relative" }} ref={officeDropdownRef}>
-            <label style={{
-              display: "block",
-              color: "white",
-              fontSize: "18px",
-              fontWeight: "500",
-              marginBottom: "12px"
-            }}>Office</label>
-            <div style={{ position: "relative" }}>
-              <input
-                value={officeQuery}
-                placeholder="请选择Office"
-                autoComplete="off"
-                onFocus={() => setOfficeOpen(!officeOpen)}
-                onMouseDown={(e) => {
-                  e.preventDefault();
-                  setOfficeOpen(!officeOpen);
-                }}
-                onChange={(event) => {
-                  const value = event.target.value;
-                  setOfficeQuery(value);
-                  updateField("office", OFFICES.includes(value) ? value : "");
-                  setOfficeOpen(true);
-                }}
-                style={{
-                  width: "100%",
-                  padding: "16px 16px",
-                  fontSize: "18px",
-                  background: "rgba(255,255,255,0.08)",
-                  border: "1px solid rgba(255,255,255,0.3)",
-                  borderRadius: "4px",
-                  color: officeQuery ? "white" : "rgba(255,255,255,0.5)",
-                  outline: "none",
-                  appearance: "none",
-                  cursor: "pointer"
-                }}
-              />
-              <span style={{
-                position: "absolute",
-                right: "16px",
-                top: "50%",
-                transform: "translateY(-50%)",
-                color: "white",
+                height: "100%",
+                background: "transparent",
+                border: "none",
+                color: officeQuery ? "white" : "rgba(255,255,255,0.4)",
                 fontSize: "14px",
-                pointerEvents: "none"
-              }}>▼</span>
-              {officeOpen && (
-                <div style={{
-                  position: "absolute",
-                  top: "100%",
-                  left: "0",
-                  right: "0",
-                  marginTop: "4px",
-                  background: "#003d1e",
-                  border: "1px solid rgba(255,255,255,0.3)",
-                  borderRadius: "4px",
-                  maxHeight: "200px",
-                  overflowY: "auto",
-                  zIndex: "100"
-                }}>
-                  {filteredOffices.length > 0 ? (
-                    filteredOffices.map((office) => (
-                      <button
-                        key={office}
-                        type="button"
-                        onClick={() => selectOffice(office)}
-                        style={{
-                          width: "100%",
-                          padding: "12px 16px",
-                          textAlign: "left",
-                          background: "transparent",
-                          border: "none",
-                          color: "white",
-                          fontSize: "16px",
-                          cursor: "pointer"
-                        }}
-                      >
-                        {office}
-                      </button>
-                    ))
-                  ) : (
-                    <div style={{ padding: "12px 16px", color: "rgba(255,255,255,0.5)" }}>
-                      未找到匹配 Office
-                    </div>
-                  )}
+                fontFamily: "Source Han Sans CN",
+                fontWeight: 400,
+                lineHeight: "20px",
+                padding: "0 40px 0 12px",
+                outline: "none",
+                cursor: "pointer"
+              }}
+            />
+            {/* 下拉箭头 */}
+            <div style={{
+              width: "24px",
+              height: "24px",
+              left: "300px",
+              top: "378px",
+              position: "absolute",
+              overflow: "hidden"
+            }}>
+              <div style={{ width: "6px", height: "4px", left: "9px", top: "10px", position: "absolute", outline: "1.50px white solid", outlineOffset: "-0.75px" }} />
+            </div>
+          </div>
+          {officeOpen && (
+            <div style={{
+              position: "absolute",
+              top: "366px",
+              left: "37px",
+              width: "301px",
+              marginTop: "52px",
+              background: "rgba(0, 61, 30, 0.95)",
+              border: "0.5px white solid",
+              borderRadius: "2px",
+              maxHeight: "200px",
+              overflowY: "auto",
+              zIndex: "100"
+            }}>
+              {filteredOffices.length > 0 ? (
+                filteredOffices.map((office) => (
+                  <button
+                    key={office}
+                    type="button"
+                    onClick={() => selectOffice(office)}
+                    style={{
+                      width: "100%",
+                      padding: "12px",
+                      textAlign: "left",
+                      background: "transparent",
+                      border: "none",
+                      color: "white",
+                      fontSize: "14px",
+                      fontFamily: "Source Han Sans CN",
+                      fontWeight: 400,
+                      cursor: "pointer"
+                    }}
+                  >
+                    {office}
+                  </button>
+                ))
+              ) : (
+                <div style={{ padding: "12px", color: "rgba(255,255,255,0.5)" }}>
+                  未找到匹配 Office
                 </div>
               )}
             </div>
-          </div>
-
-          {message && (
-            <p style={{ color: "rgba(64,216,138,1)", fontSize: "14px", textAlign: "center" }}>
-              {message}
-            </p>
           )}
-
-          <button
-            type="submit"
-            disabled={isSubmitting}
-            style={{
-              width: "100%",
-              padding: "18px",
-              marginTop: "16px",
-              background: "linear-gradient(90deg, #00b86a, #40d88a)",
-              border: "none",
-              borderRadius: "4px",
-              color: "white",
-              fontSize: "20px",
-              fontWeight: "500",
-              cursor: isSubmitting ? "not-allowed" : "pointer",
-              opacity: isSubmitting ? "0.7" : "1"
-            }}
-          >
-            {isSubmitting ? "处理中..." : "确认"}
-          </button>
-        </form>
-
-        {/* DEFINE THE GAME */}
-        <div style={{
-          marginTop: "60px",
-          textAlign: "center"
-        }}>
-          <div style={{
-            fontSize: "64px",
-            fontWeight: "bold",
-            lineHeight: "1.1",
-            background: "linear-gradient(180deg, #40d88a 0%, #008a4a 50%, #005a2c 100%)",
-            WebkitBackgroundClip: "text",
-            WebkitTextFillColor: "transparent",
-            textShadow: "0 4px 8px rgba(0,0,0,0.3)",
-            letterSpacing: "2px"
-          }}>
-            DEFINE<br />THE<br />GAME
-          </div>
         </div>
+
+        {/* 消息提示 */}
+        {message && (
+          <div style={{
+            position: "absolute",
+            left: "37px",
+            top: "410px",
+            color: "white",
+            fontSize: "14px",
+            fontFamily: "Source Han Sans CN",
+            fontWeight: 400
+          }}>
+            {message}
+          </div>
+        )}
+
+        {/* 确认按钮 */}
+        <button
+          type="submit"
+          onClick={handleSubmit}
+          disabled={isSubmitting}
+          style={{
+            width: "301px",
+            height: "48px",
+            left: "37px",
+            top: "446px",
+            position: "absolute",
+            background: "#14A33A",
+            borderRadius: "2px",
+            border: "none",
+            color: "white",
+            fontSize: "16px",
+            fontFamily: "Source Han Sans CN",
+            fontWeight: 400,
+            cursor: isSubmitting ? "not-allowed" : "pointer",
+            opacity: isSubmitting ? 0.7 : 1
+          }}
+        >
+          {isSubmitting ? "处理中..." : "确认"}
+        </button>
+
+        {/* 底部装饰文字 */}
+        <img 
+          src="https://placehold.co/197x129" 
+          style={{ width: "197px", height: "129px", left: "89px", top: "578px", position: "absolute" }} 
+          alt="Define the game"
+        />
+
+        {/* 底部指示条 */}
+        <div style={{ width: "144px", height: "5px", left: "115px", top: "791px", position: "absolute", opacity: 0.70, background: "white", borderRadius: "7px" }} />
       </div>
     </Layout>
   );
