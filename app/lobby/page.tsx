@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 import GameCard from "@/components/GameCard";
@@ -27,7 +27,26 @@ export default function LobbyPage() {
   }, [playerId, router]);
 
   if (!player || !snapshot) {
-    return <Layout title="加载中">正在读取身份...</Layout>;
+    return (
+      <Layout title="活动大厅" hideHeader>
+        <section className="lobbyPage">
+          <div className="lobbyPageBg" aria-hidden="true">
+            <Image
+              className="lobbyPageBgImage"
+              src="/image/source/register-bg.jpg"
+              alt=""
+              width={1125}
+              height={2436}
+              priority
+              sizes="100vw"
+            />
+          </div>
+          <div className="lobbyPageContent">
+            <p className="lobbyLoading">正在读取身份...</p>
+          </div>
+        </section>
+      </Layout>
+    );
   }
 
   const completedCount = player.completedGames.length;
@@ -38,59 +57,78 @@ export default function LobbyPage() {
   const quizProgress = snapshot.quizProgress;
 
   return (
-    <Layout title="活动大厅" eyebrow="LOBBY" rightSlot={<Link href="/ranking">排行</Link>}>
-      <section className="profileCard">
-        <div>
-          <span className="eyebrow">PLAYER</span>
-          <h2>{player.name}</h2>
-          <p>{player.office} / {player.team}</p>
+    <Layout title="活动大厅" hideHeader>
+      <section className="lobbyPage">
+        <div className="lobbyPageBg" aria-hidden="true">
+          <Image
+            className="lobbyPageBgImage"
+            src="/image/source/register-bg.jpg"
+            alt=""
+            width={1125}
+            height={2436}
+            priority
+            sizes="100vw"
+          />
         </div>
-        <strong>{completedCount}/4</strong>
-      </section>
 
-      <ScorePanel roundScore={roundScore} totalScore={player.totalScore} rank={snapshot.rank} />
-      <div className="progressLine"><span style={{ width: `${(completedCount / 4) * 100}%` }} /></div>
+        <div className="lobbyPageContent">
+          <header className="lobbyHeader">
+            <h1>活动大厅</h1>
+          </header>
 
-      <section className="gameList">
-        {snapshot.state.games.sort((a, b) => a.order - b.order).map((game) => {
-          const isBingo = game.key === "bingo";
-          const userBingoResult = isBingo
-            ? snapshot.results.find((result) => result.gameKey === "bingo")
-            : undefined;
-          const bingoPending = Boolean(userBingoResult?.pendingBingoScore);
+          <section className="lobbyProfile">
+            <span className="lobbyProfileLabel">PLAYER</span>
+            <div className="lobbyProfileRow">
+              <h2>{player.name}</h2>
+              <div className="lobbyProgressPill">{completedCount}/4</div>
+            </div>
+            <span className="lobbyOfficeBadge">{player.office}</span>
+          </section>
 
-          if (game.key === "quiz") {
-            const quizCompleted = quizProgress.completedCount >= quizProgress.totalCount;
-            const hasAvailableGroup = quizProgress.availableGroups.length > 0;
-            const quizStatus = quizCompleted
-              ? "已完成"
-              : !game.isOpen
-                ? "未开放"
-                : hasAvailableGroup
-                  ? "继续答题"
-                  : "等待开启";
+          <ScorePanel roundScore={roundScore} totalScore={player.totalScore} rank={snapshot.rank} />
 
-            return (
-              <GameCard
-                game={{ ...game, name: "Sector Quiz" }}
-                completed={quizCompleted}
-                key={game.key}
-                subtitle={`进度：${quizProgress.completedCount}/${quizProgress.totalCount}`}
-                statusOverride={quizStatus}
-                allowEnterOverride={game.isOpen && !quizCompleted}
-              />
-            );
-          }
+          <section className="lobbyGameList">
+            {snapshot.state.games.sort((a, b) => a.order - b.order).map((game) => {
+              const isBingo = game.key === "bingo";
+              const userBingoResult = isBingo
+                ? snapshot.results.find((result) => result.gameKey === "bingo")
+                : undefined;
+              const bingoPending = Boolean(userBingoResult?.pendingBingoScore);
 
-          return (
-            <GameCard
-              game={game}
-              completed={player.completedGames.includes(game.key)}
-              bingoPending={bingoPending}
-              key={game.key}
-            />
-          );
-        })}
+              if (game.key === "quiz") {
+                const quizCompleted = quizProgress.completedCount >= quizProgress.totalCount;
+                const hasAvailableGroup = quizProgress.availableGroups.length > 0;
+                const quizStatus = quizCompleted
+                  ? "已完成"
+                  : !game.isOpen
+                    ? "未开始"
+                    : hasAvailableGroup
+                      ? "继续答题"
+                      : "等待开启";
+
+                return (
+                  <GameCard
+                    game={{ ...game, name: "Sector Quiz" }}
+                    completed={quizCompleted}
+                    key={game.key}
+                    subtitle={`进度 ${quizProgress.completedCount}/${quizProgress.totalCount}`}
+                    statusOverride={quizStatus}
+                    allowEnterOverride={game.isOpen && !quizCompleted}
+                  />
+                );
+              }
+
+              return (
+                <GameCard
+                  game={game}
+                  completed={player.completedGames.includes(game.key)}
+                  bingoPending={bingoPending}
+                  key={game.key}
+                />
+              );
+            })}
+          </section>
+        </div>
       </section>
     </Layout>
   );

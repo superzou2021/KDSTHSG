@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import Layout from "@/components/Layout";
@@ -7,6 +8,13 @@ import { OFFICES } from "@/lib/constants";
 import { findPlayerByPhone, registerPlayer, restoreCurrentPlayerFromLocal, saveCurrentPlayer } from "@/lib/storage";
 
 const DEFAULT_TEAM = "Alpha";
+
+function formatPhoneDisplay(phone: string): string {
+  const digits = phone.replace(/\D/g, "").slice(0, 11);
+  if (digits.length <= 3) return digits;
+  if (digits.length <= 7) return `${digits.slice(0, 3)} ${digits.slice(3)}`;
+  return `${digits.slice(0, 3)} ${digits.slice(3, 7)} ${digits.slice(7)}`;
+}
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -61,14 +69,13 @@ export default function RegisterPage() {
     setOfficeOpen(false);
   }
 
-  // 点击外部关闭下拉菜单
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
       if (officeDropdownRef.current && !officeDropdownRef.current.contains(event.target as Node)) {
         setOfficeOpen(false);
       }
     }
-    
+
     if (officeOpen) {
       document.addEventListener("mousedown", handleClickOutside);
       return () => document.removeEventListener("mousedown", handleClickOutside);
@@ -108,12 +115,27 @@ export default function RegisterPage() {
   if (checking) {
     return (
       <Layout title="入场登记" eyebrow="REGISTER" hideLeftButton rightSlot={<div />} hideHeader>
-        <section className="registerShell">
-          <div className="registerCard checkingCard">
-            <div className="hongshanLogo">
-              <span>HS</span>
-              <b>HongShan</b>
-            </div>
+        <section className="registerPage registerPage--checking">
+          <div className="registerPageBg" aria-hidden="true">
+            <Image
+              className="registerPageBgImage"
+              src="/image/source/register-bg.jpg"
+              alt=""
+              width={1125}
+              height={2436}
+              priority
+              sizes="100vw"
+            />
+          </div>
+          <div className="registerPageContent">
+            <Image
+              className="registerLogo"
+              src="/image/source/logo-hongshan.png"
+              alt="HONGSHAN 红杉中国"
+              width={100}
+              height={33}
+              priority
+            />
             <p className="restoreMessage">欢迎回来，正在恢复您的参赛信息...</p>
           </div>
         </section>
@@ -123,247 +145,106 @@ export default function RegisterPage() {
 
   return (
     <Layout title="入场登记" eyebrow="REGISTER" hideLeftButton rightSlot={<div />} hideHeader>
-      <div style={{
-        minHeight: "100vh",
-        background: "linear-gradient(180deg, #005a2c 0%, #003d1e 100%)",
-        padding: "80px 20px 40px",
-        position: "relative",
-        overflow: "hidden"
-      }}>
-        {/* 装饰性线条 */}
-        <div style={{
-          position: "absolute",
-          top: "60px",
-          left: "0",
-          right: "0",
-          height: "2px",
-          background: "linear-gradient(90deg, transparent, rgba(64,216,138,0.5), transparent)"
-        }} />
-        <div style={{
-          position: "absolute",
-          top: "180px",
-          left: "0",
-          right: "0",
-          height: "1px",
-          background: "linear-gradient(90deg, transparent, rgba(64,216,138,0.3), transparent)"
-        }} />
-
-        {/* Logo */}
-        <div style={{ marginBottom: "40px" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-            <span style={{
-              fontSize: "24px",
-              fontWeight: "bold",
-              color: "white",
-              letterSpacing: "2px"
-            }}>HONGSHAN</span>
-            <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
-              <path d="M8 8h16v8h-8v8H8V8z" fill="rgba(64,216,138,0.8)" />
-              <path d="M12 4h16v8h-8v8h-8V4z" fill="rgba(64,216,138,0.5)" />
-              <path d="M16 0h16v8h-8v8h-8V0z" fill="rgba(64,216,138,0.3)" />
-            </svg>
-          </div>
-          <div style={{
-            fontSize: "14px",
-            color: "rgba(255,255,255,0.7)",
-            marginTop: "4px"
-          }}>红杉中国</div>
+      <section className="registerPage">
+        <div className="registerPageBg" aria-hidden="true">
+          <Image
+            className="registerPageBgImage"
+            src="/image/source/register-bg.jpg"
+            alt=""
+            width={1125}
+            height={2436}
+            priority
+            sizes="100vw"
+          />
         </div>
 
-        {/* 表单 */}
-        <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: "24px" }}>
-          {/* 姓名 */}
-          <div>
-            <label style={{
-              display: "block",
-              color: "white",
-              fontSize: "18px",
-              fontWeight: "500",
-              marginBottom: "12px"
-            }}>姓名</label>
-            <input
-              value={form.name}
-              maxLength={16}
-              placeholder="请输入姓名"
-              onChange={(event) => updateField("name", event.target.value)}
-              style={{
-                width: "100%",
-                padding: "16px 16px",
-                fontSize: "18px",
-                background: "rgba(255,255,255,0.08)",
-                border: "1px solid rgba(255,255,255,0.3)",
-                borderRadius: "4px",
-                color: "white",
-                outline: "none"
-              }}
-            />
-          </div>
+        <div className="registerPageContent">
+          <Image
+            className="registerLogo"
+            src="/image/source/logo-hongshan.png"
+            alt="HONGSHAN 红杉中国"
+            width={100}
+            height={33}
+            priority
+          />
 
-          {/* 手机号 */}
-          <div>
-            <label style={{
-              display: "block",
-              color: "white",
-              fontSize: "18px",
-              fontWeight: "500",
-              marginBottom: "12px"
-            }}>手机号</label>
-            <input
-              value={form.phone}
-              inputMode="tel"
-              maxLength={11}
-              placeholder="请输入手机号"
-              onChange={(event) => updateField("phone", event.target.value)}
-              style={{
-                width: "100%",
-                padding: "16px 16px",
-                fontSize: "18px",
-                background: "rgba(255,255,255,0.08)",
-                border: "1px solid rgba(255,255,255,0.3)",
-                borderRadius: "4px",
-                color: "white",
-                outline: "none"
-              }}
-            />
-          </div>
-
-          {/* Office */}
-          <div style={{ position: "relative" }} ref={officeDropdownRef}>
-            <label style={{
-              display: "block",
-              color: "white",
-              fontSize: "18px",
-              fontWeight: "500",
-              marginBottom: "12px"
-            }}>Office</label>
-            <div style={{ position: "relative" }}>
+          <form className="registerForm" onSubmit={handleSubmit}>
+            <label className="registerField">
+              <span>姓名</span>
               <input
-                value={officeQuery}
-                placeholder="请选择Office"
-                autoComplete="off"
-                onFocus={() => setOfficeOpen(!officeOpen)}
-                onMouseDown={(e) => {
-                  e.preventDefault();
-                  setOfficeOpen(!officeOpen);
-                }}
-                onChange={(event) => {
-                  const value = event.target.value;
-                  setOfficeQuery(value);
-                  updateField("office", OFFICES.includes(value) ? value : "");
-                  setOfficeOpen(true);
-                }}
-                style={{
-                  width: "100%",
-                  padding: "16px 16px",
-                  fontSize: "18px",
-                  background: "rgba(255,255,255,0.08)",
-                  border: "1px solid rgba(255,255,255,0.3)",
-                  borderRadius: "4px",
-                  color: officeQuery ? "white" : "rgba(255,255,255,0.5)",
-                  outline: "none",
-                  appearance: "none",
-                  cursor: "pointer"
-                }}
+                value={form.name}
+                maxLength={16}
+                placeholder="请输入姓名"
+                onChange={(event) => updateField("name", event.target.value)}
               />
-              <span style={{
-                position: "absolute",
-                right: "16px",
-                top: "50%",
-                transform: "translateY(-50%)",
-                color: "white",
-                fontSize: "14px",
-                pointerEvents: "none"
-              }}>▼</span>
-              {officeOpen && (
-                <div style={{
-                  position: "absolute",
-                  top: "100%",
-                  left: "0",
-                  right: "0",
-                  marginTop: "4px",
-                  background: "#003d1e",
-                  border: "1px solid rgba(255,255,255,0.3)",
-                  borderRadius: "4px",
-                  maxHeight: "200px",
-                  overflowY: "auto",
-                  zIndex: "100"
-                }}>
-                  {filteredOffices.length > 0 ? (
-                    filteredOffices.map((office) => (
-                      <button
-                        key={office}
-                        type="button"
-                        onClick={() => selectOffice(office)}
-                        style={{
-                          width: "100%",
-                          padding: "12px 16px",
-                          textAlign: "left",
-                          background: "transparent",
-                          border: "none",
-                          color: "white",
-                          fontSize: "16px",
-                          cursor: "pointer"
-                        }}
-                      >
-                        {office}
-                      </button>
-                    ))
-                  ) : (
-                    <div style={{ padding: "12px 16px", color: "rgba(255,255,255,0.5)" }}>
-                      未找到匹配 Office
-                    </div>
-                  )}
-                </div>
-              )}
+            </label>
+
+            <label className="registerField">
+              <span>手机号</span>
+              <input
+                className="registerPhoneInput"
+                value={formatPhoneDisplay(form.phone)}
+                inputMode="tel"
+                maxLength={13}
+                placeholder="请输入手机号"
+                onChange={(event) => updateField("phone", event.target.value)}
+              />
+            </label>
+
+            <div className="registerField registerField--office" ref={officeDropdownRef}>
+              <span>Office</span>
+              <div className="registerSelectWrap">
+                <input
+                  value={officeQuery}
+                  placeholder="请选择Office"
+                  autoComplete="off"
+                  onFocus={() => setOfficeOpen(true)}
+                  onMouseDown={(event) => {
+                    event.preventDefault();
+                    setOfficeOpen((open) => !open);
+                  }}
+                  onChange={(event) => {
+                    const value = event.target.value;
+                    setOfficeQuery(value);
+                    updateField("office", OFFICES.includes(value) ? value : "");
+                    setOfficeOpen(true);
+                  }}
+                />
+                <svg className="registerChevron" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                  <path d="M7 10l5 5 5-5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+                {officeOpen && (
+                  <div className="officeDropdown">
+                    {filteredOffices.length > 0 ? (
+                      filteredOffices.map((office) => (
+                        <button key={office} type="button" onClick={() => selectOffice(office)}>
+                          {office}
+                        </button>
+                      ))
+                    ) : (
+                      <em>未找到匹配 Office</em>
+                    )}
+                  </div>
+                )}
+              </div>
             </div>
-          </div>
 
-          {message && (
-            <p style={{ color: "rgba(64,216,138,1)", fontSize: "14px", textAlign: "center" }}>
-              {message}
-            </p>
-          )}
+            {message && <p className="registerMessage">{message}</p>}
 
-          <button
-            type="submit"
-            disabled={isSubmitting}
-            style={{
-              width: "100%",
-              padding: "18px",
-              marginTop: "16px",
-              background: "linear-gradient(90deg, #00b86a, #40d88a)",
-              border: "none",
-              borderRadius: "4px",
-              color: "white",
-              fontSize: "20px",
-              fontWeight: "500",
-              cursor: isSubmitting ? "not-allowed" : "pointer",
-              opacity: isSubmitting ? "0.7" : "1"
-            }}
-          >
-            {isSubmitting ? "处理中..." : "确认"}
-          </button>
-        </form>
+            <button className="registerSubmit" type="submit" disabled={isSubmitting}>
+              {isSubmitting ? "处理中..." : "确认"}
+            </button>
+          </form>
 
-        {/* DEFINE THE GAME */}
-        <div style={{
-          marginTop: "60px",
-          textAlign: "center"
-        }}>
-          <div style={{
-            fontSize: "64px",
-            fontWeight: "bold",
-            lineHeight: "1.1",
-            background: "linear-gradient(180deg, #40d88a 0%, #008a4a 50%, #005a2c 100%)",
-            WebkitBackgroundClip: "text",
-            WebkitTextFillColor: "transparent",
-            textShadow: "0 4px 8px rgba(0,0,0,0.3)",
-            letterSpacing: "2px"
-          }}>
-            DEFINE<br />THE<br />GAME
-          </div>
+          <Image
+            className="registerHero"
+            src="/image/source/define-the-game.png"
+            alt="DEFINE THE GAME"
+            width={197}
+            height={129}
+          />
         </div>
-      </div>
+      </section>
     </Layout>
   );
 }

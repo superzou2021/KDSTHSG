@@ -6,7 +6,7 @@ type ScorePanelProps = {
 
 export default function ScorePanel({ roundScore, totalScore, rank }: ScorePanelProps) {
   return (
-    <section className="scoreGrid">
+    <section className="lobbyScoreGrid">
       <div>
         <span>本关得分</span>
         <b>{roundScore}</b>
@@ -17,7 +17,7 @@ export default function ScorePanel({ roundScore, totalScore, rank }: ScorePanelP
       </div>
       <div>
         <span>当前排名</span>
-        <b>#{rank || "-"}</b>
+        <b>{rank || "-"}</b>
       </div>
     </section>
   );

@@ -824,203 +824,493 @@ button:disabled {
   color: #010203;
 }
 
-.registerShell {
-  min-height: calc(100vh - 36px);
+.mobilePage:has(.registerPage),
+.mobilePage:has(.lobbyPage) {
+  width: 100%;
+  max-width: none;
+  padding: 0;
+  gap: 0;
+}
+
+.registerPage {
   position: relative;
-  display: grid;
-  align-items: center;
-  padding: 28px 0;
+  min-height: 100vh;
+  min-height: 100dvh;
   overflow: hidden;
+  background: linear-gradient(180deg, #00523e 0%, #00b88b 100%);
 }
 
-.registerShell::before {
-  content: "";
+.registerPageBg {
   position: absolute;
-  inset: -80px -40px;
-  background:
-    radial-gradient(circle at 76% 16%, rgba(64, 216, 138, 0.24), transparent 32%),
-    radial-gradient(circle at 18% 86%, rgba(0, 184, 106, 0.18), transparent 30%),
-    linear-gradient(155deg, rgba(2, 49, 35, 0.98), rgba(4, 27, 22, 0.96) 58%, rgba(0, 67, 48, 0.94));
-  z-index: 0;
-}
-
-.registerTechLines {
-  position: absolute;
-  inset: 0;
-  z-index: 1;
+  top: 0;
+  left: 0;
+  width: 100%;
   pointer-events: none;
-  background:
-    linear-gradient(115deg, transparent 0 18%, rgba(64, 216, 138, 0.3) 18.2%, transparent 18.8% 100%),
-    linear-gradient(25deg, transparent 0 68%, rgba(64, 216, 138, 0.18) 68.2%, transparent 68.8% 100%),
-    repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.025) 0 1px, transparent 1px 34px);
-  opacity: 0.72;
 }
 
-.registerCard {
-  position: relative;
-  z-index: 2;
-  display: grid;
-  gap: 24px;
-  padding: 28px 20px 24px;
-  border: 1px solid rgba(255, 255, 255, 0.16);
-  border-radius: 18px;
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.07), rgba(255, 255, 255, 0.025)),
-    rgba(4, 34, 26, 0.72);
-  box-shadow:
-    0 24px 80px rgba(0, 0, 0, 0.42),
-    inset 0 1px 0 rgba(255, 255, 255, 0.12);
-  backdrop-filter: blur(14px);
-}
-
-.checkingCard {
-  min-height: 260px;
-  align-content: center;
-  justify-items: center;
-  text-align: center;
-}
-
-.hongshanLogo {
-  display: flex;
-  align-items: center;
-  gap: 11px;
-  color: var(--ink);
-}
-
-.hongshanLogo span {
-  width: 42px;
-  height: 42px;
-  display: grid;
-  place-items: center;
-  border: 1px solid rgba(64, 216, 138, 0.48);
-  border-radius: 9px;
-  background: rgba(0, 184, 106, 0.1);
-  color: var(--green-bright);
-  font: 900 14px/1 var(--mono);
-  box-shadow: 0 0 24px rgba(0, 184, 106, 0.18);
-}
-
-.hongshanLogo b {
-  font: 900 20px/1 var(--sans);
-  letter-spacing: 0.01em;
-}
-
-.registerBrand {
-  display: grid;
-  gap: 10px;
-}
-
-.registerBrand p,
-.restoreMessage {
-  margin: 0;
-  color: rgba(255, 255, 255, 0.68);
-  font-size: 13px;
-  line-height: 1.5;
-}
-
-.registerTitle {
-  display: grid;
-  gap: 4px;
-  font-family: var(--mono);
-  letter-spacing: 0;
-}
-
-.registerTitle span,
-.registerTitle strong {
+.registerPageBgImage {
   display: block;
-  font-weight: 900;
-  line-height: 0.92;
+  width: 100%;
+  height: auto;
 }
 
-.registerTitle span {
-  color: var(--ink);
-  font-size: 46px;
+.registerPageContent {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  max-width: 375px;
+  min-height: 100vh;
+  min-height: 100dvh;
+  margin: 0 auto;
+  padding: 64px 37px 34px;
+  display: flex;
+  flex-direction: column;
 }
 
-.registerTitle strong {
-  color: var(--green);
-  font-size: 54px;
-  text-shadow: 0 0 34px rgba(0, 184, 106, 0.42);
+.registerLogo {
+  width: 100px;
+  height: 33px;
+  object-fit: contain;
+  object-position: left center;
 }
 
 .registerForm {
   display: grid;
-  gap: 14px;
+  gap: 16px;
+  margin-top: 19px;
 }
 
-.registerForm label {
+.registerField {
   position: relative;
   display: grid;
-  gap: 8px;
+  gap: 6px;
 }
 
-.registerForm label > span {
-  color: rgba(255, 255, 255, 0.72);
-  font: 800 11px/1 var(--mono);
-  letter-spacing: 0.08em;
+.registerField > span {
+  color: #ffffff;
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 20px;
 }
 
-.registerForm input {
+.registerField input {
   width: 100%;
-  min-height: 48px;
-  padding: 0 14px;
-  color: var(--ink);
-  border: 1px solid rgba(255, 255, 255, 0.25);
-  border-radius: 10px;
+  height: 48px;
+  padding: 0 12px;
+  color: #ffffff;
+  border: 0.5px solid #ffffff;
+  border-radius: 2px;
   outline: none;
-  background: rgba(255, 255, 255, 0.06);
-  font: 800 14px/1 var(--sans);
+  background: rgba(255, 255, 255, 0.1);
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 20px;
 }
 
-.registerForm input::placeholder {
-  color: rgba(255, 255, 255, 0.5);
+.registerField input::placeholder {
+  color: rgba(255, 255, 255, 0.6);
 }
 
-.registerForm input:focus {
-  border-color: rgba(64, 216, 138, 0.78);
-  box-shadow: 0 0 0 3px rgba(0, 184, 106, 0.12);
+.registerField--office input::placeholder {
+  color: rgba(255, 255, 255, 0.4);
+}
+
+.registerField input:focus {
+  border-color: #ffffff;
+  background: rgba(255, 255, 255, 0.14);
+}
+
+.registerPhoneInput {
+  letter-spacing: 0.04em;
+  font-variant-numeric: tabular-nums;
+}
+
+.registerField--office .registerSelectWrap {
+  position: relative;
+}
+
+.registerField--office .registerChevron {
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 24px;
+  height: 24px;
+  pointer-events: none;
+  color: #ffffff;
 }
 
 .officeDropdown {
   position: absolute;
   left: 0;
   right: 0;
-  top: calc(100% + 6px);
+  top: calc(100% + 4px);
   z-index: 12;
   display: grid;
   gap: 4px;
   max-height: 174px;
   overflow-y: auto;
   padding: 8px;
-  border: 1px solid rgba(255, 255, 255, 0.18);
-  border-radius: 10px;
-  background: rgba(3, 31, 23, 0.98);
-  box-shadow: 0 18px 42px rgba(0, 0, 0, 0.34);
+  border: 0.5px solid rgba(255, 255, 255, 0.5);
+  border-radius: 2px;
+  background: rgba(0, 82, 62, 0.98);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.35);
 }
 
 .officeDropdown button {
   min-height: 38px;
-  color: var(--ink);
+  color: #ffffff;
   border: 0;
-  border-radius: 7px;
-  background: rgba(255, 255, 255, 0.06);
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.08);
   text-align: left;
   padding: 0 10px;
+  font-size: 14px;
 }
 
 .officeDropdown button:hover {
-  background: rgba(0, 184, 106, 0.24);
+  background: rgba(255, 255, 255, 0.16);
 }
 
 .officeDropdown em {
   padding: 10px;
-  color: rgba(255, 255, 255, 0.5);
-  font-size: 13px;
+  color: rgba(255, 255, 255, 0.4);
+  font-size: 14px;
   font-style: normal;
 }
 
+.registerMessage {
+  margin: 0;
+  color: #ffffff;
+  font-size: 14px;
+  line-height: 20px;
+  text-align: center;
+}
+
 .registerSubmit {
-  margin-top: 4px;
+  margin-top: 16px;
+  width: 100%;
+  height: 48px;
+  border: 0;
+  border-radius: 2px;
+  background: #14a33a;
+  color: #ffffff;
+  font-size: 16px;
+  font-weight: 400;
+  line-height: normal;
+}
+
+.registerSubmit:disabled {
+  opacity: 0.7;
+}
+
+.registerHero {
+  width: 197px;
+  height: 129px;
+  margin: 84px auto 0;
+  object-fit: contain;
+}
+
+.registerPage--checking .registerPageContent {
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+  gap: 20px;
+}
+
+.restoreMessage {
+  margin: 0;
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 14px;
+  line-height: 20px;
+}
+
+.lobbyPage {
+  position: relative;
+  min-height: 100vh;
+  min-height: 100dvh;
+  overflow: hidden;
+  background: linear-gradient(180deg, #00523e 0%, #00b88b 100%);
+}
+
+.lobbyPageBg {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  pointer-events: none;
+}
+
+.lobbyPageBgImage {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.lobbyPageContent {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  max-width: 375px;
+  min-height: 100vh;
+  min-height: 100dvh;
+  margin: 0 auto;
+  padding: 44px 24px 34px;
+  display: flex;
+  flex-direction: column;
+}
+
+.lobbyHeader {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 43px;
+  padding: 8px 0;
+}
+
+.lobbyHeader h1 {
+  margin: 0;
+  color: #ffffff;
+  font-size: 18px;
+  font-weight: 400;
+  line-height: normal;
+}
+
+.lobbyProfile {
+  position: relative;
+  margin-top: 6px;
+  margin-right: -24px;
+  margin-left: -24px;
+  padding-left: 24px;
+}
+
+.lobbyProfileLabel {
+  display: block;
+  color: rgba(255, 255, 255, 0.8);
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 26px;
+  letter-spacing: 0.04em;
+}
+
+.lobbyProfileRow {
+  position: relative;
+}
+
+.lobbyProfileRow h2 {
+  margin: 0;
+  padding-right: 88px;
+  color: #ffffff;
+  font-size: 28px;
+  font-weight: 700;
+  line-height: 26px;
+}
+
+.lobbyProgressPill {
+  position: absolute;
+  right: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  min-width: 72px;
+  padding: 8px 16px;
+  color: #ffffff;
+  font-size: 28px;
+  font-weight: 700;
+  line-height: 26px;
+  text-align: right;
+  border-radius: 43px 0 0 43px;
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.lobbyOfficeBadge {
+  display: inline-flex;
+  align-items: center;
+  height: 20px;
+  margin-top: 10px;
+  padding: 0 4px;
+  color: rgba(255, 255, 255, 0.8);
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 20px;
+  border-radius: 2px;
+  background: #14a33a;
+}
+
+.lobbyScoreGrid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  margin-top: 24px;
+}
+
+.lobbyScoreGrid > div {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  min-height: 64px;
+  padding: 8px 12px 7px;
+  text-align: center;
+  border: 1px solid #14a33a;
+  border-radius: 2px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.1) 0%, rgba(153, 153, 153, 0) 100%);
+}
+
+.lobbyScoreGrid span {
+  color: #ffffff;
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 20px;
+}
+
+.lobbyScoreGrid b {
+  color: #12cf0f;
+  font-size: 24px;
+  font-weight: 700;
+  line-height: 26px;
+}
+
+.lobbyGameList {
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+  margin-top: 18px;
+  padding-top: 20px;
+}
+
+.lobbyGameItem {
+  position: relative;
+  display: block;
+  height: 84px;
+  color: #ffffff;
+  text-decoration: none;
+}
+
+.lobbyGameItem:hover .lobbyGameCard {
+  filter: brightness(1.04);
+}
+
+.lobbyGameCard {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  height: 84px;
+  padding: 0 112px 0 20px;
+  border-radius: 4px 24px 4px 4px;
+  background: #14a33a;
+  transition: filter 180ms ease;
+}
+
+.lobbyGameCard h3 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 700;
+  line-height: normal;
+}
+
+.lobbyGameCardMeta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 11px;
+}
+
+.lobbyGameCardMeta p {
+  margin: 0;
+  color: rgba(255, 255, 255, 0.8);
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 18px;
+}
+
+.lobbyGameBadge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 40px;
+  height: 16px;
+  padding: 0 6px;
+  color: #14a33a;
+  font-size: 10px;
+  font-weight: 500;
+  line-height: 16px;
+  white-space: nowrap;
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.8);
+}
+
+.lobbyGameBadge--done {
+  color: #b8860b;
+}
+
+.lobbyGameBadge--locked {
+  color: #6b8f72;
+}
+
+.lobbyGameIcon {
+  position: absolute;
+  top: -20px;
+  right: 0;
+  z-index: 2;
+  width: 104px;
+  height: 104px;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.lobbyGameIconMain {
+  position: absolute;
+  left: var(--icon-left, 14px);
+  top: var(--icon-offset-y, 10px);
+  width: var(--icon-width, 72px);
+  height: var(--icon-height, 73px);
+}
+
+.lobbyGameIconMain img,
+.lobbyGameIconReflection img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  object-position: center bottom;
+}
+
+.lobbyGameIconReflection {
+  position: absolute;
+  left: var(--icon-left, 14px);
+  top: calc(var(--icon-offset-y, 10px) + var(--icon-height, 73px) - 1px);
+  width: var(--icon-width, 72px);
+  height: var(--icon-height, 73px);
+  overflow: hidden;
+  opacity: 0.3;
+}
+
+.lobbyGameIconReflection img {
+  transform-origin: center top;
+}
+
+.lobbyGameItem--locked {
+  pointer-events: none;
+  cursor: not-allowed;
+}
+
+.lobbyLoading {
+  margin: auto;
+  color: rgba(255, 255, 255, 0.8);
+  font-size: 14px;
+  text-align: center;
+}
+
+.lobbyHomeIndicator {
+  width: 144px;
+  height: 5px;
+  margin: auto auto 0;
+  border-radius: 7px;
+  background: rgba(255, 255, 255, 0.7);
 }
 
 .formMessage,
