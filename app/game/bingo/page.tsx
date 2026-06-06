@@ -1,14 +1,80 @@
 "use client";
 
+import Image from "next/image";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import GameBannerIcon from "@/components/GameBannerIcon";
 import Layout from "@/components/Layout";
+import PageBackground from "@/components/PageBackground";
 import ResultModal from "@/components/ResultModal";
 import WaitingModal from "@/components/WaitingModal";
 import { getPlayerRank } from "@/lib/ranking";
 import { calculateBingoScore } from "@/lib/scoring";
 import { getGameResult } from "@/lib/storage";
 import { useCurrentPlayer, useQuestions, useSubmitGameResult, useAppState } from "@/hooks/use-game-data";
+import type { Question } from "@/types";
+import type { ReactNode } from "react";
+
+function BingoShell({ children }: { children: ReactNode }) {
+  return (
+    <Layout title="Bingo 猜词" hideHeader>
+      <section className="bingoPage">
+        <PageBackground />
+
+        <div className="bingoPageContent">
+          <header className="bingoNav">
+            <Link className="bingoNavLink" href="/lobby">
+              <svg xmlns="http://www.w3.org/2000/svg" width="10" height="8" viewBox="0 0 10 8" fill="none" aria-hidden="true">
+                <path
+                  opacity="0.9"
+                  d="M0.513405 0.994867H9.4866C9.77058 0.994867 10 0.772058 10 0.497434C10 0.222938 9.77071 0 9.4866 0H0.513405C0.229945 0 0 0.222809 0 0.497434C0 0.772058 0.229945 0.994867 0.513405 0.994867ZM9.48646 3.48203H0.513405C0.229294 3.48203 0 3.70484 0 3.97947C0 4.25409 0.229294 4.4769 0.513405 4.4769H9.4866C9.77058 4.4769 10 4.25409 10 3.97947C9.99987 3.70484 9.76914 3.48203 9.48646 3.48203ZM9.48646 7.00513H0.513405C0.230075 7.00513 0 7.22794 0 7.50257C0 7.77719 0.229945 8 0.513405 8H9.4866C9.77058 8 10 7.77719 10 7.50257C9.99987 7.22807 9.77058 7.00513 9.48646 7.00513Z"
+                  fill="white"
+                />
+              </svg>
+              活动大厅
+            </Link>
+            <h1>Bingo 猜词</h1>
+            <Link className="bingoNavLink" href="/ranking">
+              <svg xmlns="http://www.w3.org/2000/svg" width="12" height="11" viewBox="0 0 12 11" fill="none" aria-hidden="true">
+                <path
+                  opacity="0.9"
+                  d="M6.5364 9.64627H5.41762C5.1141 9.64628 4.8229 9.52509 4.60756 9.30916C4.39222 9.09322 4.27022 8.80007 4.2682 8.49367V1.16034C4.2682 0.852597 4.3893 0.557461 4.60486 0.339855C4.82042 0.12225 5.11278 0 5.41762 0H6.5364C6.84124 0 7.13361 0.12225 7.34916 0.339855C7.56472 0.557461 7.68582 0.852597 7.68582 1.16034V8.49367C7.6838 8.80007 7.56181 9.09322 7.34647 9.30916C7.13113 9.52509 6.83992 9.64628 6.5364 9.64627ZM5.41762 0.773558C5.31601 0.773558 5.21856 0.814308 5.1467 0.886843C5.07485 0.959379 5.03448 1.05776 5.03448 1.16034V8.49367C5.03447 8.54411 5.04443 8.59404 5.06378 8.64053C5.08313 8.68703 5.11147 8.72917 5.14715 8.76447C5.18284 8.79977 5.22514 8.82753 5.27158 8.84611C5.31802 8.8647 5.36767 8.87374 5.41762 8.87271H6.5364C6.6367 8.87274 6.73301 8.83305 6.80465 8.76218C6.87628 8.69131 6.91753 8.5949 6.91954 8.49367V1.16034C6.91758 1.05838 6.87658 0.961145 6.80515 0.889035C6.73372 0.816924 6.6374 0.775539 6.5364 0.773558H5.41762ZM2.2682 9.64627H1.14943C0.845902 9.64628 0.554696 9.52509 0.339356 9.30916C0.124016 9.09322 0.00202349 8.80007 0 8.49367V6.46695C0 6.15921 0.1211 5.86407 0.336659 5.64647C0.552218 5.42886 0.844579 5.30661 1.14943 5.30661H2.2682C2.57305 5.30661 2.86541 5.42886 3.08097 5.64647C3.29652 5.86407 3.41762 6.15921 3.41762 6.46695V8.53235C3.40574 8.83197 3.27942 9.11532 3.06513 9.32299C2.85085 9.53066 2.56524 9.64651 2.2682 9.64627ZM1.14943 6.04149C1.04781 6.04149 0.950356 6.08224 0.878503 6.15478C0.80665 6.22731 0.766283 6.32569 0.766283 6.42827V8.49367C0.766273 8.54411 0.776233 8.59404 0.79558 8.64053C0.814927 8.68703 0.843272 8.72917 0.878954 8.76447C0.914636 8.79977 0.956938 8.82753 1.00338 8.84611C1.04982 8.8647 1.09948 8.87374 1.14943 8.87271H2.2682C2.31815 8.87374 2.3678 8.8647 2.41424 8.84611C2.46069 8.82753 2.50299 8.79977 2.53867 8.76447C2.57435 8.72917 2.6027 8.68703 2.62204 8.64053C2.64139 8.59404 2.65135 8.54411 2.65134 8.49367V6.46695C2.65134 6.36437 2.61097 6.26599 2.53912 6.19345C2.46727 6.12092 2.36981 6.08017 2.2682 6.08017L1.14943 6.04149ZM10.8506 9.64627H9.7318C9.42828 9.64628 9.13707 9.52509 8.92173 9.30916C8.70639 9.09322 8.5844 8.80007 8.58238 8.49367V4.68776C8.58438 4.38065 8.70613 4.08669 8.92125 3.86952C9.13638 3.65235 9.42757 3.52945 9.7318 3.52743H10.8506C11.1554 3.52743 11.4478 3.64968 11.6633 3.86728C11.8789 4.08489 12 4.38002 12 4.68776V8.49367C11.998 8.80007 11.876 9.09322 11.6606 9.30916C11.4453 9.52509 11.1541 9.64628 10.8506 9.64627ZM9.7318 4.30098C9.6308 4.30297 9.53448 4.34435 9.46305 4.41646C9.39162 4.48857 9.35062 4.5858 9.34866 4.68776V8.49367C9.35067 8.5949 9.39192 8.69131 9.46355 8.76218C9.53519 8.83305 9.6315 8.87274 9.7318 8.87271H10.8506C10.9005 8.87374 10.9502 8.8647 10.9966 8.84611C11.0431 8.82753 11.0854 8.79977 11.121 8.76447C11.1567 8.72917 11.1851 8.68703 11.2044 8.64053C11.2238 8.59404 11.2337 8.54411 11.2337 8.49367V4.68776C11.2337 4.58518 11.1933 4.4868 11.1215 4.41427C11.0496 4.34173 10.9522 4.30098 10.8506 4.30098H9.7318ZM11.6169 11H0.383142C0.281526 11 0.184073 10.9593 0.11222 10.8867C0.0403666 10.8142 0 10.7158 0 10.6132C0 10.5106 0.0403666 10.4123 0.11222 10.3397C0.184073 10.2672 0.281526 10.2264 0.383142 10.2264H11.6169C11.7185 10.2264 11.8159 10.2672 11.8878 10.3397C11.9596 10.4123 12 10.5106 12 10.6132C12 10.7158 11.9596 10.8142 11.8878 10.8867C11.8159 10.9593 11.7185 11 11.6169 11Z"
+                  fill="white"
+                />
+              </svg>
+              排行榜
+            </Link>
+          </header>
+
+          <div className="bingoBanner">
+            <div className="bingoBannerText">
+              <Image
+                className="bingoBannerTitle"
+                src="/image/source/bingo/bingo-title.png"
+                alt="Bingo 猜词"
+                width={116}
+                height={20}
+              />
+              <p>Guess the right words and get Bingo</p>
+            </div>
+            <GameBannerIcon
+              className="bingoBannerLogo"
+              src="/image/source/bingo/bingo-cube.png"
+              width={67}
+              height={67}
+              left={17}
+              offsetY={9}
+              containerSize={96}
+            />
+          </div>
+
+          {children}
+        </div>
+      </section>
+    </Layout>
+  );
+}
 
 export default function BingoPage() {
   const router = useRouter();
@@ -16,7 +82,14 @@ export default function BingoPage() {
   const { state } = useAppState();
   const questions = useQuestions("bingo");
   const submitGameResult = useSubmitGameResult();
-  const [selectedWords, setSelectedWords] = useState<string[]>([]);
+  const [selectedQuestionIds, setSelectedQuestionIds] = useState<string[]>([]);
+  const selectedWords = useMemo(
+    () =>
+      selectedQuestionIds
+        .map((id) => questions.find((question) => question.id === id)?.title)
+        .filter((title): title is string => Boolean(title)),
+    [selectedQuestionIds, questions]
+  );
   const [existing, setExisting] = useState<Awaited<ReturnType<typeof getGameResult>>>(null);
   const [existingLoading, setExistingLoading] = useState(true);
   const [modal, setModal] = useState({ open: false, score: 0, total: 0, rank: 0 });
@@ -24,9 +97,6 @@ export default function BingoPage() {
   const [pendingResult, setPendingResult] = useState<Awaited<ReturnType<typeof submitGameResult>> | null>(null);
   const [isLeaving, setIsLeaving] = useState(false);
   const [message, setMessage] = useState("");
-  const [hideHeader, setHideHeader] = useState(false);
-  const lastScrollY = useRef(0);
-  const touchStartY = useRef(0);
 
   // Bingo 阶段
   const bingoGame = useMemo(() => state.games.find((g) => g.key === "bingo"), [state.games]);
@@ -51,48 +121,6 @@ export default function BingoPage() {
   useEffect(() => {
     if (playerId === null) router.push("/register");
   }, [playerId, router]);
-
-  // 监听滚动和触摸事件来隐藏/显示头部
-  useEffect(() => {
-    const handleScroll = () => {
-      const currentScrollY = window.scrollY;
-      if (currentScrollY > lastScrollY.current + 20) {
-        // 上滑超过20px，隐藏头部
-        setHideHeader(true);
-      } else if (currentScrollY < lastScrollY.current - 20) {
-        // 下滑超过20px，显示头部
-        setHideHeader(false);
-      }
-      lastScrollY.current = currentScrollY;
-    };
-
-    const handleTouchStart = (e: TouchEvent) => {
-      touchStartY.current = e.touches[0].clientY;
-    };
-
-    const handleTouchMove = (e: TouchEvent) => {
-      const currentTouchY = e.touches[0].clientY;
-      const diff = touchStartY.current - currentTouchY;
-      
-      if (diff > 30) {
-        // 上滑超过30px，隐藏头部
-        setHideHeader(true);
-      } else if (diff < -30) {
-        // 下滑超过30px，显示头部
-        setHideHeader(false);
-      }
-    };
-
-    window.addEventListener("scroll", handleScroll);
-    window.addEventListener("touchstart", handleTouchStart);
-    window.addEventListener("touchmove", handleTouchMove);
-
-    return () => {
-      window.removeEventListener("scroll", handleScroll);
-      window.removeEventListener("touchstart", handleTouchStart);
-      window.removeEventListener("touchmove", handleTouchMove);
-    };
-  }, []);
 
   useEffect(() => {
     if (!playerId) {
@@ -169,42 +197,55 @@ export default function BingoPage() {
 
   if (isLeaving) {
     return (
-      <Layout title="Bingo 猜词" eyebrow="GAME 01" hideHeader={hideHeader}>
-        <section className="statusBanner">正在跳转...</section>
-      </Layout>
+      <BingoShell>
+        <section className="bingoMainCard bingoMainCard--status">
+          <p className="bingoStatusMessage">正在跳转...</p>
+        </section>
+      </BingoShell>
     );
   }
 
   // bingoPhase === closed 且用户未完成：禁止进入
   if (bingoPhase === "closed" && !hasCompletedBingo && !isWaitingForScore) {
     return (
-      <Layout title="Bingo 猜词" eyebrow="GAME 01" hideHeader={hideHeader}>
-        <section className="statusBanner">Bingo 已结束</section>
-        <button className="primaryButton" type="button" onClick={goLobby}>
-          回到大厅
-        </button>
-      </Layout>
+      <BingoShell>
+        <section className="bingoMainCard bingoMainCard--status">
+          <p className="bingoStatusMessage">Bingo 已结束</p>
+          <button className="bingoSubmitButton" type="button" onClick={goLobby}>
+            回到大厅
+          </button>
+        </section>
+      </BingoShell>
     );
   }
 
   // 等待数据加载中
   if (existingLoading) {
     return (
-      <Layout title="Bingo 猜词" eyebrow="GAME 01" hideHeader={hideHeader}>
-        <section className="statusBanner">游戏加载中,请耐心等待</section>
-      </Layout>
+      <BingoShell>
+        <section className="bingoMainCard bingoMainCard--status">
+          <p className="bingoStatusMessage">游戏加载中，请耐心等待</p>
+        </section>
+      </BingoShell>
     );
   }
 
   // 用户能否操作（选词与提交）
   const canInteract = !hasCompletedBingo && !isWaitingForScore && bingoPhase !== "closed";
 
-  function toggleWord(word: string) {
+  function toggleQuestion(question: Question) {
     if (!canInteract) return;
-    setSelectedWords((current) => {
-      if (current.includes(word)) return current.filter((item) => item !== word);
+    setSelectedQuestionIds((current) => {
+      if (current.includes(question.id)) {
+        return current.filter((id) => id !== question.id);
+      }
       if (current.length >= 9) return current;
-      return [...current, word];
+      // 同一标题可能对应多条题目记录，按 id 选中并替换旧项，避免词库高亮与宫格数量不一致
+      const withoutSameTitle = current.filter((id) => {
+        const item = questions.find((entry) => entry.id === id);
+        return item?.title !== question.title;
+      });
+      return [...withoutSameTitle, question.id];
     });
   }
 
@@ -233,67 +274,52 @@ export default function BingoPage() {
     }
   }
 
-  return (
-    <Layout title="Bingo 猜词" eyebrow="GAME 01" hideHeader={hideHeader}>
-      <div style={{ textAlign: "center", marginBottom: "24px" }}>
-        <div style={{ fontSize: "64px", marginBottom: "8px" }}>🎯</div>
-        <h2
-          style={{
-            fontSize: "32px",
-            fontWeight: "bold",
-            margin: 0,
-            background: "linear-gradient(90deg, #40d88a, #00b86a)",
-            WebkitBackgroundClip: "text",
-            WebkitTextFillColor: "transparent"
-          }}
-        >
-          Bingo 猜词
-        </h2>
-        <p style={{ color: "var(--ink)", margin: "8px 0 0 0", fontSize: "14px" }}>
-          Guess the right words and get Bingo!
-        </p>
-      </div>
+  const statusHint = message || "请从词库中选择9个词组成 Bingo 宫格";
 
+  return (
+    <BingoShell>
       {bingoPhase === "auto_score" && !hasCompletedBingo && (
-        <section className="statusBanner" style={{ color: "var(--green-bright)", borderColor: "rgba(64,216,138,0.5)", background: "rgba(0,184,106,0.08)" }}>
-          Boss 发言已完成，提交后系统将自动判分。
-        </section>
+        <p className="bingoPhaseNotice">Boss 发言已完成，提交后系统将自动判分。</p>
       )}
 
-      <section className="wordBank">
-        {questions.map((question) => (
-          <button
-            className={selectedWords.includes(question.title) ? "selected" : ""}
-            disabled={!canInteract}
-            key={question.id}
-            type="button"
-            onClick={() => toggleWord(question.title)}
-          >
-            {question.title}
-          </button>
-        ))}
-      </section>
+      <section className="bingoMainCard">
+        <div className="bingoStatus">
+          <b>已选 {selectedWords.length}/9</b>
+          <span>{statusHint}</span>
+        </div>
 
-      <section className="bingoBoard demoBoard" style={{ marginTop: "20px" }}>
-        {Array.from({ length: 9 }).map((_, index) => (
-          <div className={selectedWords[index] ? "lit" : ""} key={index}>
-            {selectedWords[index] || index + 1}
+        <div className="bingoWordBank">
+          {questions.map((question) => (
+            <button
+              className={selectedQuestionIds.includes(question.id) ? "selected" : ""}
+              disabled={!canInteract}
+              key={question.id}
+              type="button"
+              onClick={() => toggleQuestion(question)}
+            >
+              {question.title}
+            </button>
+          ))}
+        </div>
+
+        <div className="bingoGridWrap">
+          <div className="bingoGrid">
+            {Array.from({ length: 9 }).map((_, index) => (
+              <div className={selectedWords[index] ? "lit" : ""} key={index}>
+                <span>{selectedWords[index] || ""}</span>
+              </div>
+            ))}
           </div>
-        ))}
-      </section>
-
-      <section className="statusPanel">
-        <b>已选 {selectedWords.length}/9</b>
-        <span>{message || "请从词库中选择 9 个词组成 Bingo 宫格。"}</span>
+        </div>
       </section>
 
       <button
-        className="primaryButton"
+        className="bingoSubmitButton"
         type="button"
         disabled={!canInteract || selectedWords.length !== 9}
         onClick={handleSubmit}
       >
-        提交 Bingo
+        提交
       </button>
 
       <ResultModal
@@ -305,6 +331,6 @@ export default function BingoPage() {
         onBackLobby={goLobby}
       />
       <WaitingModal open={(waitingModal || isWaitingForScore) && !modal.open} gameName="Bingo 猜词" />
-    </Layout>
+    </BingoShell>
   );
 }

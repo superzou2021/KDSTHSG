@@ -4,6 +4,7 @@ import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import Layout from "@/components/Layout";
+import PageBackground from "@/components/PageBackground";
 import { OFFICES } from "@/lib/constants";
 import { findPlayerByPhone, registerPlayer, restoreCurrentPlayerFromLocal, saveCurrentPlayer } from "@/lib/storage";
 
@@ -116,17 +117,7 @@ export default function RegisterPage() {
     return (
       <Layout title="入场登记" eyebrow="REGISTER" hideLeftButton rightSlot={<div />} hideHeader>
         <section className="registerPage registerPage--checking">
-          <div className="registerPageBg" aria-hidden="true">
-            <Image
-              className="registerPageBgImage"
-              src="/image/source/register-bg.jpg"
-              alt=""
-              width={1125}
-              height={2436}
-              priority
-              sizes="100vw"
-            />
-          </div>
+          <PageBackground />
           <div className="registerPageContent">
             <Image
               className="registerLogo"
@@ -146,17 +137,7 @@ export default function RegisterPage() {
   return (
     <Layout title="入场登记" eyebrow="REGISTER" hideLeftButton rightSlot={<div />} hideHeader>
       <section className="registerPage">
-        <div className="registerPageBg" aria-hidden="true">
-          <Image
-            className="registerPageBgImage"
-            src="/image/source/register-bg.jpg"
-            alt=""
-            width={1125}
-            height={2436}
-            priority
-            sizes="100vw"
-          />
-        </div>
+        <PageBackground />
 
         <div className="registerPageContent">
           <Image

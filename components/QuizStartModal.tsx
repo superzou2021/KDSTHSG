@@ -11,14 +11,24 @@ export default function QuizStartModal({ open, onStart }: QuizStartModalProps) {
   return (
     <div className="modalMask">
       <section className="resultModal">
-        <span className="eyebrow">游戏准备</span>
-        <div style={{ fontSize: '64px', margin: '16px 0' }}>⚡</div>
-        <h2 style={{ fontSize: '28px', marginBottom: '16px' }}>Sector Quiz</h2>
-        <p style={{ color: 'var(--muted)', marginBottom: '8px' }}>共5个板块，每板块2题</p>
-        <p style={{ color: 'var(--muted)', marginBottom: '24px' }}>每板块限时1分钟</p>
-        <button className="primaryButton" type="button" onClick={onStart}>
-          开始答题
-        </button>
+        <div className="resultModalGlow" aria-hidden="true" />
+        <div className="resultModalBody">
+          <div className="resultModalHeader">
+            <span className="resultModalEyebrow">游戏准备</span>
+            <h2 className="resultModalTitle">Sector Quiz</h2>
+          </div>
+
+          <div className="resultModalMain">
+            <p className="resultModalWaiting">共5个板块，每板块2题</p>
+            <p className="resultModalWaiting">每板块限时1分钟</p>
+          </div>
+
+          <div className="resultModalFooter">
+            <button className="resultModalButton" type="button" onClick={onStart}>
+              开始答题
+            </button>
+          </div>
+        </div>
       </section>
     </div>
   );

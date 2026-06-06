@@ -1,10 +1,10 @@
 "use client";
 
-import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 import GameCard from "@/components/GameCard";
 import Layout from "@/components/Layout";
+import PageBackground from "@/components/PageBackground";
 import ScorePanel from "@/components/ScorePanel";
 import { restoreCurrentPlayerFromLocal } from "@/lib/storage";
 import { useCurrentPlayer, useLobbySnapshot } from "@/hooks/use-game-data";
@@ -30,17 +30,7 @@ export default function LobbyPage() {
     return (
       <Layout title="活动大厅" hideHeader>
         <section className="lobbyPage">
-          <div className="lobbyPageBg" aria-hidden="true">
-            <Image
-              className="lobbyPageBgImage"
-              src="/image/source/register-bg.jpg"
-              alt=""
-              width={1125}
-              height={2436}
-              priority
-              sizes="100vw"
-            />
-          </div>
+          <PageBackground />
           <div className="lobbyPageContent">
             <p className="lobbyLoading">正在读取身份...</p>
           </div>
@@ -59,17 +49,9 @@ export default function LobbyPage() {
   return (
     <Layout title="活动大厅" hideHeader>
       <section className="lobbyPage">
-        <div className="lobbyPageBg" aria-hidden="true">
-          <Image
-            className="lobbyPageBgImage"
-            src="/image/source/register-bg.jpg"
-            alt=""
-            width={1125}
-            height={2436}
-            priority
-            sizes="100vw"
-          />
-        </div>
+        <PageBackground />
+
+        <div className="lobbyProgressPill">{completedCount}/4</div>
 
         <div className="lobbyPageContent">
           <header className="lobbyHeader">
@@ -80,7 +62,6 @@ export default function LobbyPage() {
             <span className="lobbyProfileLabel">PLAYER</span>
             <div className="lobbyProfileRow">
               <h2>{player.name}</h2>
-              <div className="lobbyProgressPill">{completedCount}/4</div>
             </div>
             <span className="lobbyOfficeBadge">{player.office}</span>
           </section>
