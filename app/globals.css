@@ -1639,7 +1639,7 @@ button:disabled {
   display: grid;
   place-items: center;
   padding: 18px;
-  background: rgba(0, 0, 0, 0.72);
+  background: rgba(0, 0, 0, 0.8);
 }
 
 .resultModal {
@@ -1944,51 +1944,271 @@ button:disabled {
 }
 
 .screenPage {
+  position: relative;
   min-height: 100vh;
-  padding: 28px;
-  background:
-    radial-gradient(ellipse at 50% 25%, rgba(64, 216, 138, 0.2), transparent 55%),
-    #063125;
+  width: 100%;
+  overflow-x: auto;
+  background: #00523e;
+}
+
+.screenPageBg {
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  z-index: 0;
+  background: #00523e;
+}
+
+.screenPageBgImage {
+  object-fit: cover;
+  opacity: 0.6;
+}
+
+.screenPageBgGradient {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(to bottom, rgba(0, 82, 62, 0) 0%, #004937 99.996%);
+  pointer-events: none;
+}
+
+.screenPageContent {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  min-height: 100vh;
+  margin: 0 auto;
+  padding: 90px 0 40px 0;
+  box-sizing: border-box;
+}
+
+.screenPageInner {
+  width: 1200px;
+  margin: 0 auto;
+  box-sizing: border-box;
 }
 
 .screenHeader {
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
-  margin-bottom: 18px;
+  gap: 32px;
+  margin-bottom: 24px;
 }
 
-.screenHeader h1 {
-  margin: 8px 0 0;
-  font: 900 46px/1 var(--mono);
+.screenHeaderMain {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
 }
 
-.screenHeader strong {
-  color: var(--gold);
-  font: 900 34px/1 var(--mono);
+.screenEyebrow {
+  color: rgba(255, 255, 255, 0.8);
+  font-size: 16px;
+  font-weight: 400;
+  line-height: 25px;
+}
+
+.screenTitleRow {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.screenTitle {
+  margin: 0;
+  color: #ffffff;
+  font-size: 56px;
+  font-weight: 900;
+  line-height: 1.1;
+}
+
+.screenLogo {
+  flex-shrink: 0;
+  width: 79px;
+  height: 79px;
+  object-fit: contain;
+}
+
+.screenParticipantCount {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin: 0;
+}
+
+.screenParticipantCount strong {
+  color: #12cf0f;
+  font-size: 32px;
+  font-weight: 900;
+  line-height: 1;
+}
+
+.screenParticipantCount span {
+  color: rgba(255, 255, 255, 0.8);
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 18px;
+}
+
+.screenQrBlock {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+  flex-shrink: 0;
+}
+
+.screenQrFrame {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 136px;
+  height: 136px;
+  padding: 8px;
+  border-radius: 4px;
+  background: #ffffff;
+  box-sizing: border-box;
+  overflow: hidden;
+}
+
+.screenQrImage {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.screenQrBlock p {
+  margin: 0;
+  color: #ffffff;
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 26px;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.screenLoading {
+  display: grid;
+  place-items: center;
+  min-height: 400px;
 }
 
 .screenGrid {
   display: grid;
-  grid-template-columns: 1.25fr 1fr;
-  gap: 14px;
+  grid-template-columns: 596px 596px;
+  column-gap: 6px;
+  align-items: start;
 }
 
-.screenPanel {
-  padding: 16px;
+.screenSideColumn {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.screenPage .screenPanel {
+  position: relative;
+  box-sizing: border-box;
+  padding: 29px 20px 20px;
+  border: 1px solid #5e9f8e;
+  border-radius: 2px;
+  background: transparent;
+  overflow: hidden;
+}
+
+.screenPage .screenPanel::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(2px);
+  opacity: 0.6;
+  pointer-events: none;
+}
+
+.screenPage .screenPanel > * {
+  position: relative;
+  z-index: 1;
 }
 
 .top10Panel {
   grid-row: span 2;
 }
 
-.screenPage .tableRow {
-  min-height: 58px;
+.screenPage .screenPanel h2 {
+  margin: 0 0 20px;
+  color: #ffffff;
+  font-size: 24px;
+  font-weight: 500;
+  line-height: 25px;
 }
 
-.screenPage .tableRow b,
-.screenPage .tableRow strong {
-  font-size: 20px;
+.screenPanelHeader {
+  position: relative;
+  min-height: 40px;
+  margin-bottom: 20px;
+}
+
+.screenPanelHeader h2 {
+  margin: 0 !important;
+}
+
+.screenTop10Watermark {
+  position: absolute;
+  right: 0;
+  top: 0;
+  width: 163px;
+  height: 40px;
+  opacity: 0.3;
+  pointer-events: none;
+  object-fit: contain;
+}
+
+.screenPage .rankingList {
+  gap: 1px;
+}
+
+.screenPage .rankingRow {
+  min-height: 58px;
+  padding: 0 16px;
+  border-radius: 2px;
+  background: rgba(8, 132, 49, 0.4);
+}
+
+.screenPage .top10Panel .rankingRow {
+  min-height: 62px;
+}
+
+.screenPage .rankingRow.current {
+  outline: 1px solid rgba(18, 207, 15, 0.5);
+  background: rgba(8, 132, 49, 0.55);
+}
+
+.screenPage .rankingOfficeGroupHeader {
+  height: 46px;
+  padding: 0 16px;
+  color: #12cf0f;
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 46px;
+  border-radius: 2px;
+  background: transparent;
+}
+
+.screenPage .screenSideColumn .screenPanel:last-child .rankingList {
+  gap: 1px;
+}
+
+.screenPage .screenSideColumn .screenPanel:last-child .rankingOfficeTopList {
+  gap: 12px;
+}
+
+.screenPage .screenSideColumn .screenPanel:last-child .rankingOfficeGroup {
+  gap: 1px;
 }
 
 .adminList {
@@ -3261,12 +3481,14 @@ button:disabled {
   justify-content: center;
   width: 58px;
   height: 58px;
+  background: transparent;
 }
 
 .rankingMedal img {
   width: 58px;
   height: 58px;
   object-fit: contain;
+  background: transparent;
 }
 
 .rankingRankCircle {
@@ -3343,12 +3565,8 @@ button:disabled {
   border-radius: 4px;
 }
 
-@media (max-width: 760px) {
-  .screenGrid {
-    grid-template-columns: 1fr;
-  }
-
-  .screenHeader h1 {
-    font-size: 30px;
+@media (max-width: 1920px) {
+  .screenPageContent {
+    margin: 0;
   }
 }

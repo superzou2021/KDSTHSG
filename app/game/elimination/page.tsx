@@ -11,7 +11,7 @@ import EliminationModal from "@/components/EliminationModal";
 import ResultModal from "@/components/ResultModal";
 import { calculateEliminationScore } from "@/lib/scoring";
 import { getGameResult } from "@/lib/storage";
-import { useCurrentPlayer, useGameStatus, useQuestions, useSubmitGameResult } from "@/hooks/use-game-data";
+import { useCurrentPlayer, useGameStatus, useQuestions, useRanking, useSubmitGameResult } from "@/hooks/use-game-data";
 
 function EliminationNav() {
   return (
@@ -76,7 +76,8 @@ function EliminationShell({ children }: { children: ReactNode }) {
 
 export default function EliminationPage() {
   const router = useRouter();
-  const { playerId, refresh } = useCurrentPlayer();
+  const { playerId, refresh, player } = useCurrentPlayer();
+  const { ranking } = useRanking(playerId);
   const questions = useQuestions("elimination");
   const submitGameResult = useSubmitGameResult();
   const isOpen = useGameStatus("elimination");
@@ -85,7 +86,7 @@ export default function EliminationPage() {
   const [existing, setExisting] = useState<Awaited<ReturnType<typeof getGameResult>>>(null);
   const [existingLoading, setExistingLoading] = useState(true);
   const [modal, setModal] = useState({ open: false, score: 0, total: 0, rank: 0, isEliminated: false });
-  const [eliminationModal, setEliminationModal] = useState({ open: false, type: "correct" as "correct" | "eliminated" });
+  const [eliminationModal, setEliminationModal] = useState({ open: false, score: 0 });
   const [message, setMessage] = useState("");
   const [isLeaving, setIsLeaving] = useState(false);
 
@@ -153,7 +154,7 @@ export default function EliminationPage() {
           setMessage(error instanceof Error ? error.message : "提交失败");
         }
       } else {
-        setEliminationModal({ open: true, type: "correct" });
+        setEliminationModal({ open: true, score: newScore });
       }
     } else {
       if (!playerId) return;
@@ -170,7 +171,7 @@ export default function EliminationPage() {
 
   function goNext() {
     setCurrentIndex((index) => Math.min(index + 1, questions.length - 1));
-    setEliminationModal({ open: false, type: "correct" });
+    setEliminationModal({ open: false, score: 0 });
     setMessage("");
   }
 
@@ -248,6 +249,7 @@ export default function EliminationPage() {
         totalScore={modal.total}
         rank={modal.rank}
         isEliminated={modal.isEliminated}
+        eliminationModalStyle={modal.isEliminated ? "wrong" : "standard"}
         onBackLobby={() => {
           router.replace("/result");
           window.setTimeout(() => {
@@ -261,9 +263,10 @@ export default function EliminationPage() {
 
       <EliminationModal
         open={eliminationModal.open}
-        type={eliminationModal.type}
+        roundScore={eliminationModal.score}
+        totalScore={player?.totalScore ?? 0}
+        rank={ranking.context?.rank ?? 0}
         onNext={goNext}
-        onBack={() => router.push("/lobby")}
       />
     </EliminationShell>
   );
